@@ -1,7 +1,5 @@
 /* PopGuard service worker: wires the modules together. */
-importScripts('../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js');
-
-const RULESET_KIND = { ads: 'ad', trackers: 'tracker', betting: 'betting', _dynamic: 'custom' };
+importScripts('../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js');
 
 async function syncEverything() {
   await PGFilters.applyRulesets();
@@ -25,17 +23,8 @@ chrome.storage.onChanged.addListener((c, area) => {
 
 PGGuard.listen();
 
-// ---- Network blocks -> statistics ----
-// onRuleMatchedDebug is available to unpacked (developer-mode) installs.
-// A Web Store build would switch to declarativeNetRequest.getMatchedRules().
-if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
-  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(({ request, rule }) => {
-    if (rule.rulesetId === '_dynamic' && (rule.ruleId === 1 || rule.ruleId === 3)) return; // whitelist "allow" rules
-    const kind = RULESET_KIND[rule.rulesetId] || 'custom';
-    const site = PG.hostOf(request.initiator || request.documentUrl || '');
-    PGStats.record(kind, { tabId: request.tabId, site, target: request.url });
-  });
-}
+// ---- Network blocks -> statistics (see netstats.js for the two modes) ----
+PGNetStats.start();
 
 // ---- Messages from content scripts, popup and dashboard ----
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -54,6 +43,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'tabCount':
       sendResponse({ count: PGStats.tabCount(msg.tabId) });
       break;
+    case 'pollNetStats': // popup / dashboard opened: pull in the latest network blocks first
+      (PGNetStats.mode === 'poll' ? PGNetStats.poll() : Promise.resolve(0)).then((n) => sendResponse({ n }));
+      return true;
     case 'resetStats':
       PGStats.reset().then(() => sendResponse({ ok: true }));
       return true;

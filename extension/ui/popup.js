@@ -6,6 +6,8 @@
   const host = /^https?:/.test(tab?.url || '') ? PG.hostOf(tab.url) : '';
   $('site').textContent = host || 'not a web page';
 
+  const polled = await chrome.runtime.sendMessage({ type: 'pollNetStats' }).catch(() => null);
+  if (polled?.n) await new Promise((r) => setTimeout(r, 1100)); // new blocks are saved in 1-second batches
   const { stats, whitelist = [] } = await chrome.storage.local.get(['stats', 'whitelist']);
   const todayCounts = stats?.byDay?.[PG.today()] || {};
   $('today').textContent = Object.values(todayCounts).reduce((a, b) => a + b, 0).toLocaleString();

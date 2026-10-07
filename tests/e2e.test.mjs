@@ -3,7 +3,7 @@
  * fixture pages that copy what pop-under / click-hijack sites do.
  *
  *   npm test                 (headless)
- *   SCREENSHOTS=1 npm test   (also refreshes docs/screenshots/)
+ *   npm run screenshots      (also refreshes docs/screenshots/)
  *
  * Two origins are used so "another website" is real:
  *   http://localhost:8765   = the page you're visiting
@@ -70,7 +70,7 @@ async function visit(file, action) {
 const results = [];
 async function test(name, fn) {
   try { await fn(); results.push([true, name]); console.log('  ✓', name); }
-  catch (e) { results.push([false, name]); console.log('  ✗', name, '\n     ', e.message.split('\n')[0]); }
+  catch (e) { results.push([false, name]); console.log('  ✗', name, '\n     ', e.message.split('\n').slice(0,8).join('\n      ')); }
 }
 
 console.log('\nPopGuard e2e\n');
@@ -157,6 +157,28 @@ await test('records statistics by type, site and day', async () => {
   assert.ok(stats.bySite.localhost > 0, 'site bucket');
 });
 
+await test('store installs still count network blocks (getMatchedRules polling)', async () => {
+  await sw.evaluate(() => { PGNetStats.setMode('poll'); return chrome.storage.session.set({ netStatsSince: Date.now() }); });
+  await sw.evaluate(() => PGStats.reset());
+  await storage.set({ customDomains: ['127.0.0.1'] });
+  await wait(600);
+  try {
+    const r = await visit('tracker.html');
+    const n = await sw.evaluate(() => PGNetStats.poll()); // poll while the tab is open, as the popup does
+    await r.done();
+    assert.ok(n >= 1, `poll found ${n} matches`);
+    await wait(1500);
+    const stats = await storage.get('stats');
+    assert.ok(stats.byKind.custom >= 1, JSON.stringify(stats.byKind));
+    assert.ok(stats.bySite.localhost >= 1, 'site from tab URL: ' + JSON.stringify(stats.bySite));
+    assert.equal(await sw.evaluate(() => PGNetStats.poll()), 0, 'second poll must not double count');
+  } finally {
+    await sw.evaluate(() => PGNetStats.setMode('debug'));
+    await storage.set({ customDomains: [] });
+    await wait(600);
+  }
+});
+
 await test('imports an EasyList / hosts style filter list', async () => {
   const dash = await ctx.newPage();
   await dash.goto(`chrome-extension://${extId}/ui/dashboard.html#filters`);
@@ -213,7 +235,7 @@ await test('dashboard renders tiles, chart and tables', async () => {
 });
 
 // ---------- screenshots for the README (demo data) ----------
-if (process.env.SCREENSHOTS) {
+if (process.env.SCREENSHOTS || process.argv.includes('--screenshots')) {
   const demo = { total: 0, since: Date.now() - 30 * 864e5, byKind: {}, byDay: {}, bySite: {}, byTarget: {} };
   const rnd = (a, b) => Math.round(a + Math.random() * (b - a));
   for (let i = 29; i >= 0; i--) {

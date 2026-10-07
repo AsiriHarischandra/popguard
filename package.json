@@ -1,13 +1,15 @@
 {
   "name": "popguard",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Chrome extension that stops click-redirects, pop-ups and invisible overlays, blocks ads and trackers, and shows what it blocked.",
   "type": "module",
   "scripts": {
     "test": "node tests/e2e.test.mjs",
-    "screenshots": "SCREENSHOTS=1 node tests/e2e.test.mjs",
-    "zip": "cd extension && zip -qr ../popguard-extension.zip . -x '.*'"
+    "build": "node scripts/build.mjs",
+    "screenshots": "node tests/e2e.test.mjs --screenshots",
+    "store-images": "node scripts/store-images.mjs",
+    "icons": "node scripts/render-icons.mjs"
   },
   "devDependencies": {
     "playwright": "^1.56.0"

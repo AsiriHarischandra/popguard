@@ -68,7 +68,7 @@
           .t{position:fixed;right:16px;bottom:16px;z-index:2147483647;max-width:360px;
              font:13px/1.4 system-ui,sans-serif;background:#111827;color:#f9fafb;border-radius:10px;
              padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.35);display:flex;gap:10px;align-items:center}
-          .m{flex:1;word-break:break-all} b{color:#93c5fd}
+          .m{flex:1;overflow-wrap:anywhere} b{color:#93c5fd}
           button{all:unset;cursor:pointer;padding:4px 8px;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;white-space:nowrap}
           .x{background:transparent;color:#9ca3af;font-weight:400}
         </style>

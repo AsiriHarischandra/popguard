@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><title>StreamBox - Watch</title>
+<style>
+ body{margin:0;background:#0f1115;color:#e8e8e8;font:15px/1.5 system-ui,sans-serif}
+ header{display:flex;align-items:center;gap:28px;padding:14px 32px;background:#16181d;border-bottom:1px solid #23262d}
+ header b{font-size:20px;color:#ff5a5f} header span{color:#9aa0a6}
+ main{display:grid;grid-template-columns:1fr 300px;gap:24px;padding:24px 32px}
+ .player{position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:linear-gradient(135deg,#2b3a55,#11151c 60%,#3a2440)}
+ .player:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 40%,rgba(255,255,255,.08),transparent 50%)}
+ .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:84px;height:84px;border-radius:50%;background:rgba(255,255,255,.92);border:0;cursor:pointer;z-index:1}
+ .play:before{content:"";position:absolute;left:34px;top:24px;border-left:24px solid #111;border-top:18px solid transparent;border-bottom:18px solid transparent}
+ .bar{position:absolute;left:0;right:0;bottom:0;height:44px;background:linear-gradient(transparent,rgba(0,0,0,.6));z-index:1}
+ h1{font-size:22px;margin:16px 0 4px} p{color:#9aa0a6;margin:0}
+ .side div{height:70px;border-radius:8px;background:#1b1e24;margin-bottom:12px;display:flex;align-items:center;padding:0 14px;color:#9aa0a6}
+</style></head><body>
+<header><b>StreamBox</b><span>Home</span><span>Movies</span><span>Series</span><span>Subtitles</span></header>
+<main><div><div class="player"><button class="play" id="play" aria-label="Play"></button><div class="bar"></div></div>
+<h1>The Long Voyage (2026)</h1><p>Drama · 2h 04m · Sinhala subtitles</p></div>
+<div class="side"><div>Up next: Northern Lights</div><div>Up next: Quiet Harbour</div><div>Up next: The Last Map</div><div>Up next: Paper Kites</div></div></main>
+<script>document.addEventListener('click',()=>{window.open('http://win-big-prizes.example:8765/ad.html')});</script>
+</body></html>

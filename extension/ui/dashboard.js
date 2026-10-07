@@ -342,6 +342,7 @@
   // ---------------- boot + live refresh ----------------
   function renderAll() { renderOverview(); renderFilters(); renderWhitelist(); renderSettings(); }
   renderAll();
+  chrome.runtime.sendMessage({ type: 'pollNetStats' }).catch(() => {}); // new numbers arrive via storage.onChanged
   let t = null;
   chrome.storage.onChanged.addListener((c, area) => {
     if (area !== 'local') return;

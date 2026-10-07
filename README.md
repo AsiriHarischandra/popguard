@@ -65,7 +65,7 @@ flowchart LR
   COS -- runtime message --> S
   G --> INJ
   F --> DNR
-  DNR -- onRuleMatchedDebug --> S
+  DNR -- onRuleMatchedDebug (dev) / getMatchedRules (store) --> S
   S --> ST
   UI <--> ST
   ST -- onChanged --> F & G
@@ -79,7 +79,11 @@ Design decisions worth calling out:
 - **Batched stats.** A busy page can trigger dozens of tracker blocks in a burst. Stats are buffered and written at most once per second through a promise chain, so writes never interleave.
 - **No dependencies.** Extension pages can't load CDN scripts under Manifest V3, so the chart is a small hand-written SVG renderer (`ui/chart.js`). The chart palette was checked for color-blind safety.
 
-## Install (developer mode)
+## Install
+
+**From a store:** coming soon. Submission guide and listing material are in [`docs/store/`](docs/store/PUBLISHING.md).
+
+**Developer mode:**
 
 1. Download or clone this repository.
 2. Open `chrome://extensions` (it also works in Edge, Brave and Opera).
@@ -92,8 +96,11 @@ End-to-end tests load the real extension into Chromium with Playwright. They run
 
 ```bash
 npm install
-npm test            # 15 end-to-end tests
-npm run screenshots # also regenerates docs/screenshots (demo data)
+npm test               # 16 end-to-end tests
+npm run build          # store upload: dist/popguard-<version>-store.zip
+npm run screenshots    # regenerates docs/screenshots (demo data)
+npm run store-images   # regenerates store screenshots and promo tiles
+npm run icons          # renders the icons from docs/store/icon.svg
 ```
 
 The tests cover the following:
@@ -125,10 +132,14 @@ docs/           screenshots/
 ## Limitations and next steps
 
 - Built-in lists are small and hand-picked (about 140 rules). For full coverage, import EasyPrivacy or Peter Lowe's list from the Filters page.
-- Network-block statistics use `onRuleMatchedDebug`, which only works for unpacked installs. A Chrome Web Store build would switch to `getMatchedRules()`.
+- Network-block statistics come from `onRuleMatchedDebug` in developer mode, and from `getMatchedRules()` polled once a minute in store installs (Chrome allows 20 calls per 10 minutes). Store installs therefore don't show *which* domain was blocked, and Chrome stops reporting the tab once it's closed, so those blocks count by type but not by site.
 - Redirects started by cross-origin iframes, or more than 2 seconds after a click, aren't intercepted.
 - The registrable-domain check is a heuristic, not the full Public Suffix List.
 - Cosmetic rules from imported lists aren't supported yet.
+
+## Privacy
+
+PopGuard collects nothing: no account, no server, no analytics. See [PRIVACY.md](PRIVACY.md).
 
 ## Tech
 
