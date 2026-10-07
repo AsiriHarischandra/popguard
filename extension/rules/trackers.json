@@ -1,0 +1,130 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "requestDomains": [
+        "addthis.com",
+        "adroll.com",
+        "ads-twitter.com",
+        "ads.linkedin.com",
+        "agkn.com",
+        "amplitude.com",
+        "analytics.google.com",
+        "analytics.tiktok.com",
+        "bat.bing.com",
+        "bluekai.com",
+        "chartbeat.com",
+        "chartbeat.net",
+        "clarity.ms",
+        "crazyegg.com",
+        "crwdcntrl.net",
+        "ct.pinterest.com",
+        "demdex.net",
+        "everesttech.net",
+        "exelator.com",
+        "fullstory.com",
+        "getclicky.com",
+        "google-analytics.com",
+        "googletagmanager.com",
+        "heapanalytics.com",
+        "histats.com",
+        "hm.baidu.com",
+        "hotjar.com",
+        "hotjar.io",
+        "hs-analytics.net",
+        "inspectlet.com",
+        "kissmetrics.io",
+        "krxd.net",
+        "lr-ingest.io",
+        "luckyorange.com",
+        "luckyorange.net",
+        "mathtag.com",
+        "mc.yandex.ru",
+        "mixpanel.com",
+        "mookie1.com",
+        "mouseflow.com",
+        "mxpnl.com",
+        "nr-data.net",
+        "omtrdc.net",
+        "onesignal.com",
+        "pushwoosh.com",
+        "quantcount.com",
+        "quantserve.com",
+        "rlcdn.com",
+        "sc-static.net",
+        "scorecardresearch.com",
+        "segment.com",
+        "segment.io",
+        "sharethis.com",
+        "smartlook.com",
+        "snap.licdn.com",
+        "ssl.google-analytics.com",
+        "statcounter.com",
+        "taboola-analytics.com",
+        "tapad.com",
+        "top-fwz1.mail.ru",
+        "tr.snapchat.com"
+      ],
+      "resourceTypes": [
+        "sub_frame",
+        "script",
+        "xmlhttprequest",
+        "image",
+        "ping",
+        "media",
+        "websocket",
+        "font",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||facebook.com/tr",
+      "resourceTypes": [
+        "sub_frame",
+        "script",
+        "xmlhttprequest",
+        "image",
+        "ping",
+        "media",
+        "websocket",
+        "font",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||connect.facebook.net^*/fbevents.js",
+      "resourceTypes": [
+        "sub_frame",
+        "script",
+        "xmlhttprequest",
+        "image",
+        "ping",
+        "media",
+        "websocket",
+        "font",
+        "stylesheet",
+        "other"
+      ]
+    }
+  }
+]

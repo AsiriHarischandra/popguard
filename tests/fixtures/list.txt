@@ -1,0 +1,7 @@
+! Title: Test list
+||ads.example-one.com^
+||track.example-two.net^$third-party
+0.0.0.0 bad.example-three.org
+plain-domain.example.com
+example.com##.cosmetic-rule-is-skipped
+||example.com/path/ad.js

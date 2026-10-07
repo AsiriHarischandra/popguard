@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PopGuard Dashboard</title>
+<link rel="icon" href="../icons/icon32.png">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="../icons/icon48.png" alt=""><span>PopGuard</span><span class="muted ver" id="ver"></span></div>
+  <nav role="tablist" aria-label="Sections">
+    <a href="#overview" role="tab" data-tab="overview">Overview</a>
+    <a href="#filters" role="tab" data-tab="filters">Filters</a>
+    <a href="#whitelist" role="tab" data-tab="whitelist">Whitelist</a>
+    <a href="#settings" role="tab" data-tab="settings">Settings</a>
+  </nav>
+</header>
+
+<main>
+  <div class="welcome card" id="welcome" hidden>
+    <div>
+      <h2>PopGuard is on</h2>
+      <p class="secondary">It's already blocking pop-ups, click-redirects, ads and trackers. Everything it stops shows up here.</p>
+    </div>
+    <button class="btn" id="welcomeClose">Got it</button>
+  </div>
+
+  <!-- ============ OVERVIEW ============ -->
+  <section id="tab-overview" data-panel="overview">
+    <div class="filterbar" role="group" aria-label="Date range">
+      <span class="muted">Range</span>
+      <button class="chip" data-range="7">Last 7 days</button>
+      <button class="chip" data-range="14">Last 14 days</button>
+      <button class="chip" data-range="30">Last 30 days</button>
+    </div>
+
+    <div class="tiles">
+      <div class="tile card"><span class="label">Blocked in range</span><b class="num" id="tRange">0</b><span class="sub muted" id="tAll"></span></div>
+      <div class="tile card"><span class="label">Today</span><b class="num" id="tToday">0</b><span class="sub muted" id="tTodayVs"></span></div>
+      <div class="tile card"><span class="label">Pop-ups &amp; redirects</span><b class="num" id="tPopups">0</b><span class="sub muted">in range</span></div>
+      <div class="tile card"><span class="label">Trackers blocked</span><b class="num" id="tTrackers">0</b><span class="sub muted">in range</span></div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-head">
+        <h3>Blocks per day</h3>
+        <button class="btn small" id="tableToggle" aria-pressed="false">Show table</button>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="chart" id="chart"></div>
+      <div class="table-wrap" id="chartTable" hidden></div>
+      <div class="tooltip" id="tooltip" role="status" hidden></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><h3>Sites where PopGuard worked hardest</h3><span class="muted small">all time</span></div>
+        <div class="bars" id="topSites"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Most-blocked domains</h3><span class="muted small">all time</span></div>
+        <div class="bars" id="topTargets"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>By type</h3><span class="muted small" id="byTypeRange"></span></div>
+      <table class="kinds" id="kinds"></table>
+    </div>
+  </section>
+
+  <!-- ============ FILTERS ============ -->
+  <section id="tab-filters" data-panel="filters" hidden>
+    <div class="card">
+      <div class="card-head"><h3>Built-in lists</h3></div>
+      <div class="list-rows" id="builtins"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Import a filter list</h3></div>
+      <p class="secondary">Paste the web address of a list. PopGuard reads EasyList-style <code>||domain^</code> rules, hosts files and plain domain lists. It doesn't import cosmetic or path rules.</p>
+      <form class="inline-form" id="importForm">
+        <input type="url" id="importUrl" placeholder="https://example.com/list.txt" required>
+        <button class="btn primary" type="submit" id="importBtn">Import</button>
+      </form>
+      <div class="presets"><span class="muted">Popular:</span>
+        <button class="chip" data-preset="https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&amp;showintro=0&amp;mimetype=plaintext">Peter Lowe's ad &amp; tracking list</button>
+        <button class="chip" data-preset="https://easylist.to/easylist/easyprivacy.txt">EasyPrivacy</button>
+      </div>
+      <p class="status" id="importStatus" role="status"></p>
+      <div class="list-rows" id="imported"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><h3>My blocked domains</h3></div>
+        <p class="secondary">One domain per line. Subdomains are blocked too.</p>
+        <textarea id="customDomains" rows="8" spellcheck="false" placeholder="ads.example.com&#10;tracker.example.net"></textarea>
+        <div class="save-row"><span class="status" id="domainsStatus" role="status"></span><button class="btn primary" id="saveDomains">Save</button></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>My element-hiding filters</h3></div>
+        <p class="secondary"><code>site.com##.selector</code> hides on one site and <code>##.selector</code> hides everywhere. Your right-click picks are saved here too.</p>
+        <textarea id="cosmetic" rows="8" spellcheck="false" placeholder="example.com##.sidebar-ad&#10;##.sponsored-box"></textarea>
+        <div class="save-row"><span class="status" id="cosmeticStatus" role="status"></span><button class="btn primary" id="saveCosmetic">Save</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHITELIST ============ -->
+  <section id="tab-whitelist" data-panel="whitelist" hidden>
+    <div class="card">
+      <div class="card-head"><h3>Trusted sites</h3></div>
+      <p class="secondary">PopGuard does nothing on these sites. No blocking, hiding or redirect protection.</p>
+      <form class="inline-form" id="wlForm">
+        <input type="text" id="wlInput" placeholder="example.com" required>
+        <button class="btn primary" type="submit">Add site</button>
+      </form>
+      <p class="status" id="wlStatus" role="status"></p>
+      <ul class="wl" id="wlList"></ul>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="tab-settings" data-panel="settings" hidden>
+    <div class="card">
+      <div class="card-head"><h3>Protection</h3></div>
+      <div class="list-rows" id="featureToggles"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Your data</h3></div>
+      <p class="secondary">Settings, whitelist and filters stay in this browser. PopGuard never sends anything anywhere.</p>
+      <div class="btn-row">
+        <button class="btn" id="exportBtn">Export settings</button>
+        <label class="btn" for="importFile">Import settings</label>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="btn danger" id="resetStats">Reset statistics</button>
+      </div>
+      <p class="status" id="dataStatus" role="status"></p>
+    </div>
+  </section>
+</main>
+
+<script src="../shared/defaults.js"></script>
+<script src="chart.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>

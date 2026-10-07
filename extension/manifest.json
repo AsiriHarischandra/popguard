@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "PopGuard",
+  "version": "2.0.0",
+  "description": "Stops click-redirects, pop-ups and invisible overlays; blocks ads and trackers; shows what was blocked.",
+  "minimum_chrome_version": "111",
+  "permissions": [
+    "contextMenus",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "scripting",
+    "storage",
+    "unlimitedStorage",
+    "tabs",
+    "webNavigation"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background/service-worker.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["shared/defaults.js", "content/content.js", "content/cosmetic.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      { "id": "ads", "enabled": true, "path": "rules/ads.json" },
+      { "id": "trackers", "enabled": true, "path": "rules/trackers.json" },
+      { "id": "betting", "enabled": true, "path": "rules/betting.json" }
+    ]
+  },
+  "action": {
+    "default_popup": "ui/popup.html",
+    "default_title": "PopGuard",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "options_page": "ui/dashboard.html",
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+}

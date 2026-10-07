@@ -1,0 +1,61 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "requestDomains": [
+        "1win.com",
+        "1win.pro",
+        "1xbet.com",
+        "1xbet.lk",
+        "1xlite.com",
+        "22bet.com",
+        "bc.game",
+        "betwinner.com",
+        "linebet.com",
+        "melbet.com",
+        "mostbet.com",
+        "parimatch.com",
+        "pin-up.casino",
+        "stake.com"
+      ],
+      "resourceTypes": [
+        "sub_frame",
+        "script",
+        "xmlhttprequest",
+        "image",
+        "ping",
+        "media",
+        "websocket",
+        "font",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "regexFilter": "^https?://([^/]*[.-])?(1x(bet|lite|slot)|melbet|betwinner|mostbet|linebet|1win|refpa[a-z0-9]*)[a-z0-9-]*\\.",
+      "resourceTypes": [
+        "sub_frame",
+        "script",
+        "xmlhttprequest",
+        "image",
+        "ping",
+        "media",
+        "websocket",
+        "font",
+        "stylesheet",
+        "other"
+      ]
+    }
+  }
+]

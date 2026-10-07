@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PopGuard</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  body { width: 300px; background: var(--surface-1); }
+  header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  header img { width: 22px; height: 22px; }
+  header h1 { font-size: 15px; flex: 1; }
+  header .ver { font-size: 12px; }
+  main { padding: 12px 14px 14px; display: grid; gap: 12px; }
+  .site { font-weight: 600; word-break: break-all; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tile { background: var(--surface-2); border-radius: 8px; padding: 8px 6px; text-align: center; }
+  .tile b { display: block; font-size: 20px; }
+  .tile span { font-size: 11px; color: var(--text-secondary); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+         background: var(--surface-2); border-radius: 8px; padding: 10px; }
+  .row label { cursor: pointer; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .actions .btn { font-size: 13px; padding: 7px 8px; }
+  .hint { font-size: 12px; margin: 0; }
+  .off-note { font-size: 12px; color: var(--danger); margin: -4px 0 0; }
+</style>
+</head>
+<body>
+  <header>
+    <img src="../icons/icon48.png" alt="">
+    <h1>PopGuard</h1>
+    <span class="ver muted" id="ver"></span>
+  </header>
+  <main>
+    <div><span class="muted">This site:</span> <span class="site" id="site">-</span></div>
+    <div class="tiles">
+      <div class="tile"><b class="num" id="tab">0</b><span>this page</span></div>
+      <div class="tile"><b class="num" id="today">0</b><span>today</span></div>
+      <div class="tile"><b class="num" id="total">0</b><span>all time</span></div>
+    </div>
+    <div class="row">
+      <label for="toggle">Protect this site</label>
+      <span class="switch"><input type="checkbox" id="toggle" checked><span></span></span>
+    </div>
+    <p class="off-note" id="offNote" hidden>PopGuard is paused on this site.</p>
+    <div class="actions">
+      <button class="btn primary" id="dash">Dashboard</button>
+      <button class="btn" id="reset" title="Remove the ads you hid with right-click on this site">Unhide ads here</button>
+    </div>
+    <p class="hint muted">Missed an ad? Right-click it &rarr; <b>PopGuard: Hide this ad</b>.</p>
+  </main>
+  <script src="../shared/defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

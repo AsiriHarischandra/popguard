@@ -1,0 +1,108 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "requestDomains": [
+        "adcash.com",
+        "adsterra.com",
+        "adsterra.network",
+        "clickadu.com",
+        "exoclick.com",
+        "exosrv.com",
+        "highperformanceformat.com",
+        "hilltopads.net",
+        "juicyads.com",
+        "onclickads.net",
+        "onclkds.com",
+        "popads.net",
+        "popcash.net",
+        "popmyads.com",
+        "propellerads.com",
+        "propellerclick.com",
+        "realsrv.com",
+        "trafficstars.com",
+        "tsyndicate.com"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "script",
+        "xmlhttprequest",
+        "image",
+        "ping",
+        "media",
+        "websocket",
+        "font",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "requestDomains": [
+        "3lift.com",
+        "adform.net",
+        "adnxs.com",
+        "adsafeprotected.com",
+        "adservice.google.com",
+        "adsrvr.org",
+        "adstudio.cloud",
+        "advertising.com",
+        "amazon-adsystem.com",
+        "bidswitch.net",
+        "casalemedia.com",
+        "contextweb.com",
+        "criteo.com",
+        "criteo.net",
+        "doubleclick.net",
+        "doubleverify.com",
+        "googleadservices.com",
+        "googlesyndication.com",
+        "gumgum.com",
+        "indexww.com",
+        "lijit.com",
+        "media.net",
+        "mgid.com",
+        "moatads.com",
+        "openx.net",
+        "outbrain.com",
+        "pubmatic.com",
+        "revcontent.com",
+        "rubiconproject.com",
+        "sharethrough.com",
+        "smartadserver.com",
+        "sovrn.com",
+        "spotx.tv",
+        "spotxchange.com",
+        "taboola.com",
+        "teads.tv",
+        "trafficjunky.net",
+        "undertone.com",
+        "yieldmo.com",
+        "zergnet.com"
+      ],
+      "resourceTypes": [
+        "sub_frame",
+        "script",
+        "xmlhttprequest",
+        "image",
+        "ping",
+        "media",
+        "websocket",
+        "font",
+        "stylesheet",
+        "other"
+      ]
+    }
+  }
+]
