@@ -40,7 +40,7 @@ const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.t
   headless: true,
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
   viewport: { width: 1200, height: 800 },
-  args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`],
+  args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--host-resolver-rules=MAP login.live.com 127.0.0.1'],
 });
 let [sw] = ctx.serviceWorkers();
 if (!sw) sw = await ctx.waitForEvent('serviceworker');
@@ -105,6 +105,18 @@ await test('never closes tabs opened by browser pages (New Tab shortcuts)', asyn
     return still;
   }, AD + 'real.html');
   assert.equal(alive, true, 'shortcut tab was closed');
+});
+
+await test('never blocks sign-in pages (e.g. Microsoft account picker -> login.live.com)', async () => {
+  const r = await visit('signin.html', (p) => p.click('#account'));
+  assert.notEqual(r.url, SITE + 'signin.html', 'sign-in redirect was blocked');
+  await r.done();
+});
+
+await test('still blocks the same kind of script redirect to an unknown site', async () => {
+  const r = await visit('signin.html', (p) => p.click('#other'));
+  assert.equal(r.url, SITE + 'signin.html');
+  await r.done();
 });
 
 await test('removes an invisible overlay and passes the click to the Play button', async () => {

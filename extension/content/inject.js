@@ -20,6 +20,12 @@
     } catch { return ''; }
   };
   const isSafeScheme = (u) => /^(blob:|data:|javascript:|mailto:|tel:)/i.test(u || '');
+  // Sign-in and payment pages. Logins jump between these with scripts (e.g. Microsoft's account
+  // picker -> login.live.com, "Sign in with Google" pop-ups). Ad scripts never send you here.
+  const SIGN_IN = ['login.live.com', 'login.microsoftonline.com', 'login.microsoft.com', 'account.live.com', 'account.microsoft.com', 'accounts.google.com', 'appleid.apple.com', 'idmsa.apple.com', 'github.com', 'facebook.com', 'x.com', 'twitter.com', 'linkedin.com', 'paypal.com', 'checkout.stripe.com', 'okta.com', 'auth0.com'];
+  const isSignIn = (u) => {
+    try { const h = new URL(u).hostname; return SIGN_IN.some((d) => h === d || h.endsWith('.' + d)); } catch { return false; }
+  };
   const sameSite = (u) => {
     if (!u || isSafeScheme(u)) return true;
     if (u === 'about:blank') return false;
@@ -97,6 +103,7 @@
 
   function guardedOpen(url, name, features) {
     const u = abs(url) || 'about:blank';
+    if (isSignIn(u)) return realOpen.apply(window, arguments);
     if (sameSite(u) && u !== 'about:blank') {
       if (freshClick()) lastClick.openedSelf = true; // possible tab-under setup
       return realOpen.apply(window, arguments);
@@ -152,7 +159,7 @@
       if (!e.cancelable || e.hashChange || e.downloadRequest) return;
       if (e.navigationType === 'reload' || e.navigationType === 'traverse') return;
       const dest = e.destination.url;
-      if (sameSite(dest)) return;
+      if (sameSite(dest) || isSignIn(dest)) return;
       if (!freshClick()) return;                 // only redirects caused by a click
       if (e.userInitiated && !lastClick.openedSelf) return; // real link the user clicked
       if (matchesClickedLink(dest) && !lastClick.openedSelf) return;

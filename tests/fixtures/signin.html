@@ -1,0 +1,7 @@
+<!-- Like Microsoft's account picker: a div (not a link) that moves the page with script -->
+<div id="account" role="button" style="width:300px;padding:16px;border:1px solid #ccc;cursor:pointer">Asiri - Signed in</div>
+<div id="other" role="button" style="width:300px;padding:16px;margin-top:10px;border:1px solid #ccc;cursor:pointer">Something else</div>
+<script>
+document.getElementById('account').onclick = () => { location.href = 'http://login.live.com:8765/real.html'; };
+document.getElementById('other').onclick = () => { location.href = 'http://127.0.0.1:8765/real.html'; };
+</script>

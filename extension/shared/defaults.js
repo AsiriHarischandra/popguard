@@ -49,7 +49,17 @@ PG.siteOf = (hostOrUrl) => {
 };
 
 /** Browser start pages are web pages too (Edge New Tab = ntp.msn.com). PopGuard never touches them. */
-PG.BUILTIN_TRUSTED = ['ntp.msn.com', 'ntp.msn.cn'];
+PG.BUILTIN_TRUSTED = ['ntp.msn.com', 'ntp.msn.cn',
+  // sign-in / developer pages: no ads, and their script-driven redirects must never be blocked
+  'login.live.com', 'login.microsoftonline.com', 'login.microsoft.com', 'account.live.com',
+  'account.microsoft.com', 'partner.microsoft.com', 'accounts.google.com', 'appleid.apple.com'];
+
+/** Sign-in and payment hosts: new tabs and redirects to these are always allowed. */
+PG.SIGN_IN = ['login.live.com', 'login.microsoftonline.com', 'login.microsoft.com', 'account.live.com', 'account.microsoft.com', 'accounts.google.com', 'appleid.apple.com', 'idmsa.apple.com', 'github.com', 'facebook.com', 'x.com', 'twitter.com', 'linkedin.com', 'paypal.com', 'checkout.stripe.com', 'okta.com', 'auth0.com'];
+PG.isSignIn = (url) => {
+  const h = PG.hostOf(url);
+  return !!h && PG.SIGN_IN.some((d) => h === d || h.endsWith('.' + d));
+};
 
 PG.isWhitelisted = (host, whitelist) =>
   !!host && [...(whitelist || []), ...PG.BUILTIN_TRUSTED].some((d) => host === d || host.endsWith('.' + d));

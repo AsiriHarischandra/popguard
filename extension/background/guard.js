@@ -36,6 +36,7 @@ const PGGuard = (() => {
     const { whitelist = [] } = await chrome.storage.local.get('whitelist');
     if (PG.isWhitelisted(PG.hostOf(srcUrl), whitelist)) return;
     if (PG.siteOf(targetUrl) === PG.siteOf(srcUrl)) return;
+    if (PG.isSignIn(targetUrl)) return; // "Sign in with ..." windows
     const lc = lastClick.get(srcTabId);
     if (lc && Date.now() - lc.t < 3000 && lc.href && strip(lc.href) === strip(targetUrl)) return;
     chrome.tabs.remove(newTabId).catch(() => {});

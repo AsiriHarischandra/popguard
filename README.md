@@ -96,7 +96,7 @@ End-to-end tests load the real extension into Chromium with Playwright. They run
 
 ```bash
 npm install
-npm test               # 16 end-to-end tests
+npm test               # 18 end-to-end tests
 npm run build          # store upload: dist/popguard-<version>-store.zip
 npm run screenshots    # regenerates docs/screenshots (demo data)
 npm run store-images   # regenerates store screenshots and promo tiles

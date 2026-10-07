@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1
+- Fix: sign-in flows were blocked as redirects (e.g. Microsoft's account picker moving to login.live.com).
+  Redirects and pop-ups to known sign-in/payment hosts are always allowed, and sign-in pages are trusted
+
 ## 2.1.0 (store-ready)
 - Statistics work in store installs: `getMatchedRules()` is polled once a minute (and when the popup or dashboard opens),
   with a per-tab URL history so blocks are credited to the right site

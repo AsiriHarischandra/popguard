@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PopGuard: Click Redirect & Pop-up Blocker",
   "short_name": "PopGuard",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Stops sites from hijacking your clicks: blocks pop-ups, click-redirects, invisible ad overlays, ads and trackers.",
   "homepage_url": "https://github.com/AsiriHarischandra/popguard",
   "minimum_chrome_version": "111",
