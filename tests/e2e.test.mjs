@@ -93,6 +93,20 @@ await test('allows shortcut tiles built with web components (shadow DOM)', async
   await r.done();
 });
 
+await test('never closes tabs opened by browser pages (New Tab shortcuts)', async () => {
+  // Edge reports New Tab shortcuts as opened by "edge://newtab/". Ask the guard to judge such a tab.
+  const alive = await sw.evaluate(async (url) => {
+    const src = await chrome.tabs.create({ url: 'about:blank', active: false });
+    const tab = await chrome.tabs.create({ url, active: false });
+    await PGGuard.judgeNewTab(tab.id, src.id, 'edge://newtab/', url);
+    await new Promise((r) => setTimeout(r, 500));
+    const still = await chrome.tabs.get(tab.id).then(() => true, () => false);
+    await chrome.tabs.remove([src.id, tab.id]).catch(() => {});
+    return still;
+  }, AD + 'real.html');
+  assert.equal(alive, true, 'shortcut tab was closed');
+});
+
 await test('removes an invisible overlay and passes the click to the Play button', async () => {
   const r = await visit('overlay.html', (p) => p.mouse.click(130, 110));
   assert.deepEqual(r.newTabs, []);
@@ -162,6 +176,19 @@ await test('whitelisted sites are left alone', async () => {
   assert.deepEqual(r.newTabs, [AD + 'ad.html']);
   await r.done();
   await storage.set({ whitelist: [] });
+  await wait(800);
+});
+
+await test('trusted pages can load things PopGuard would normally block', async () => {
+  await storage.set({ whitelist: ['localhost'], customDomains: ['127.0.0.1'] });
+  await wait(800);
+  const r = await visit('tracker.html');
+  const loaded = await r.page.evaluate(() => document.getElementById('custom').naturalWidth);
+  assert.ok(loaded > 0, 'image from a blocked domain should load on a trusted page');
+  const rules = await sw.evaluate(() => chrome.declarativeNetRequest.getDynamicRules());
+  assert.ok(rules.some((x) => x.id === 3 && x.condition.initiatorDomains.includes('ntp.msn.com')), 'start-page allow rule');
+  await r.done();
+  await storage.set({ whitelist: [], customDomains: [] });
   await wait(800);
 });
 

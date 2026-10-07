@@ -3,6 +3,7 @@
  *  - Static rulesets (rules/ads.json, trackers.json, betting.json) switched on/off from Settings.
  *  - Dynamic rules rebuilt from storage:
  *      id 1          allowAllRequests for whitelisted sites (beats every block rule)
+ *      id 3          allow anything a whitelisted / start page requests
  *      id 2          the user's custom blocked domains
  *      id 10..       one rule per imported filter list
  */
@@ -24,14 +25,27 @@ const PGFilters = (() => {
     });
   }
 
-  async function rebuildDynamic() {
+  // Rebuilds can be triggered from several places at once (storage changes, list import).
+  // Run them one at a time, or two rebuilds race and try to add the same rule IDs.
+  let rebuildChain = Promise.resolve();
+  function rebuildDynamic() {
+    rebuildChain = rebuildChain.then(doRebuild, doRebuild);
+    return rebuildChain;
+  }
+
+  async function doRebuild() {
     const { whitelist = [], customDomains = [], importedLists = [] } =
       await chrome.storage.local.get(['whitelist', 'customDomains', 'importedLists']);
     const rules = [];
     const trusted = [...whitelist, ...PG.BUILTIN_TRUSTED];
     if (trusted.length) {
+      // id 1: trusted page loaded normally -> allow everything inside it
       rules.push({ id: 1, priority: 100, action: { type: 'allowAllRequests' },
         condition: { requestDomains: trusted, resourceTypes: ['main_frame', 'sub_frame'] } });
+      // id 3: requests MADE BY a trusted page, even when the browser loads that page
+      // specially (Edge's New Tab page is prerendered/cached, so rule 1 never fires there)
+      rules.push({ id: 3, priority: 100, action: { type: 'allow' },
+        condition: { initiatorDomains: trusted, resourceTypes: SUB } });
     }
     const custom = [...new Set(customDomains.map(cleanDomain).filter(isHost))];
     if (custom.length) {

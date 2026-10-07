@@ -92,7 +92,7 @@ End-to-end tests load the real extension into Chromium with Playwright. They run
 
 ```bash
 npm install
-npm test            # 13 end-to-end tests
+npm test            # 15 end-to-end tests
 npm run screenshots # also regenerates docs/screenshots (demo data)
 ```
 

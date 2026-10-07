@@ -28,6 +28,9 @@ const PGGuard = (() => {
   }
 
   async function judgeNewTab(newTabId, srcTabId, srcUrl, targetUrl) {
+    // Only web pages can show ads. Tabs opened by browser pages (edge://newtab, chrome://...,
+    // extension pages) are always the user's own choice - e.g. New Tab shortcuts.
+    if (!/^https?:/i.test(srcUrl)) return;
     const settings = await PG.getSettings();
     if (!settings.blockPopups) return;
     const { whitelist = [] } = await chrome.storage.local.get('whitelist');
@@ -62,5 +65,5 @@ const PGGuard = (() => {
     chrome.tabs.onRemoved.addListener((id) => { lastClick.delete(id); watchBlank.delete(id); PGStats.forgetTab(id); });
   }
 
-  return { registerMain, listen, noteClick: (tabId, href) => lastClick.set(tabId, { href, t: Date.now() }) };
+  return { registerMain, listen, judgeNewTab, noteClick: (tabId, href) => lastClick.set(tabId, { href, t: Date.now() }) };
 })();

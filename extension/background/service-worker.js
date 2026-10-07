@@ -30,7 +30,7 @@ PGGuard.listen();
 // A Web Store build would switch to declarativeNetRequest.getMatchedRules().
 if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
   chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(({ request, rule }) => {
-    if (rule.rulesetId === '_dynamic' && rule.ruleId === 1) return; // whitelist "allow" rule
+    if (rule.rulesetId === '_dynamic' && (rule.ruleId === 1 || rule.ruleId === 3)) return; // whitelist "allow" rules
     const kind = RULESET_KIND[rule.rulesetId] || 'custom';
     const site = PG.hostOf(request.initiator || request.documentUrl || '');
     PGStats.record(kind, { tabId: request.tabId, site, target: request.url });
