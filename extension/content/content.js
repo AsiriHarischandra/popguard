@@ -71,13 +71,14 @@
 
   // ---- Report genuine link clicks to background ----
   const linkFrom = (e) => {
-    const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    const path = e.composedPath ? e.composedPath() : [e.target];
+    const a = path.find((n) => n && n.matches && n.matches('a[href]'));
     return a ? a.href : null;
   };
   for (const t of ['mousedown', 'auxclick', 'contextmenu', 'keydown']) {
     window.addEventListener(t, (e) => {
       if (!e.isTrusted || Date.now() < swallowUntil) return;
-      const href = t === 'keydown' ? (e.key === 'Enter' ? linkFrom({ target: document.activeElement }) : null) : linkFrom(e);
+      const href = t === 'keydown' ? (e.key === 'Enter' ? linkFrom({ target: document.activeElement, composedPath: null }) : null) : linkFrom(e);
       send({ type: 'click', href });
     }, true);
   }

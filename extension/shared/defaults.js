@@ -48,8 +48,11 @@ PG.siteOf = (hostOrUrl) => {
   return p.slice(twoPartTld ? -3 : -2).join('.');
 };
 
+/** Browser start pages are web pages too (Edge New Tab = ntp.msn.com). PopGuard never touches them. */
+PG.BUILTIN_TRUSTED = ['ntp.msn.com', 'ntp.msn.cn'];
+
 PG.isWhitelisted = (host, whitelist) =>
-  !!host && (whitelist || []).some((d) => host === d || host.endsWith('.' + d));
+  !!host && [...(whitelist || []), ...PG.BUILTIN_TRUSTED].some((d) => host === d || host.endsWith('.' + d));
 
 PG.today = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
 

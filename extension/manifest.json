@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PopGuard",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Stops click-redirects, pop-ups and invisible overlays; blocks ads and trackers; shows what was blocked.",
   "minimum_chrome_version": "111",
   "permissions": [

@@ -87,6 +87,12 @@ await test('still opens a real link the user clicked', async () => {
   await r.done();
 });
 
+await test('allows shortcut tiles built with web components (shadow DOM)', async () => {
+  const r = await visit('shortcut-tile.html', (p) => p.click('#host', { position: { x: 20, y: 20 } }));
+  assert.equal(r.url, AD + 'real.html');
+  await r.done();
+});
+
 await test('removes an invisible overlay and passes the click to the Play button', async () => {
   const r = await visit('overlay.html', (p) => p.mouse.click(130, 110));
   assert.deepEqual(r.newTabs, []);

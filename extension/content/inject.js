@@ -28,7 +28,13 @@
   const strip = (u) => (u || '').split('#')[0].replace(/\/$/, '');
   const freshClick = () => Date.now() - lastClick.t < CLICK_WINDOW_MS;
   const matchesClickedLink = (u) => freshClick() && lastClick.href && strip(lastClick.href) === strip(u);
-  const linkOf = (el) => (el && el.closest ? el.closest('a[href],area[href]') : null);
+  // composedPath() sees links inside shadow DOM (web-component pages like Edge's New Tab)
+  const linkOf = (e) => {
+    for (const n of (e.composedPath ? e.composedPath() : [e.target])) {
+      if (n && n.matches && n.matches('a[href],area[href]')) return n;
+    }
+    return null;
+  };
 
   const report = (kind, url) => {
     try {
@@ -40,7 +46,7 @@
   for (const type of ['pointerdown', 'mousedown', 'click', 'auxclick', 'touchstart']) {
     window.addEventListener(type, (e) => {
       if (!e.isTrusted) return;
-      const a = linkOf(e.target);
+      const a = linkOf(e);
       if (type === 'pointerdown' || type === 'mousedown' || type === 'touchstart') {
         lastClick = { t: Date.now(), href: a ? abs(a.getAttribute('href')) : null, el: e.target, openedSelf: false };
       } else {

@@ -28,9 +28,10 @@ const PGFilters = (() => {
     const { whitelist = [], customDomains = [], importedLists = [] } =
       await chrome.storage.local.get(['whitelist', 'customDomains', 'importedLists']);
     const rules = [];
-    if (whitelist.length) {
+    const trusted = [...whitelist, ...PG.BUILTIN_TRUSTED];
+    if (trusted.length) {
       rules.push({ id: 1, priority: 100, action: { type: 'allowAllRequests' },
-        condition: { requestDomains: whitelist, resourceTypes: ['main_frame', 'sub_frame'] } });
+        condition: { requestDomains: trusted, resourceTypes: ['main_frame', 'sub_frame'] } });
     }
     const custom = [...new Set(customDomains.map(cleanDomain).filter(isHost))];
     if (custom.length) {

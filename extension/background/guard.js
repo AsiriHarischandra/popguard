@@ -22,7 +22,7 @@ const PGGuard = (() => {
     js.push('content/inject.js');
     await chrome.scripting.registerContentScripts([{
       id: MAIN_ID, js, matches: ['<all_urls>'],
-      excludeMatches: whitelist.map((d) => `*://*.${d}/*`),
+      excludeMatches: [...whitelist, ...PG.BUILTIN_TRUSTED].map((d) => `*://*.${d}/*`),
       runAt: 'document_start', allFrames: true, world: 'MAIN', persistAcrossSessions: true,
     }]);
   }

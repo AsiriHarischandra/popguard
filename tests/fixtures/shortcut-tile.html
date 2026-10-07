@@ -1,0 +1,6 @@
+<ntp-tile id="host"></ntp-tile>
+<script>
+const r=document.getElementById('host').attachShadow({mode:'open'});
+r.innerHTML='<a id="a" href="http://127.0.0.1:8765/real.html" style="display:block;width:80px;height:80px;background:#333">WhatsApp</a>';
+r.getElementById('a').addEventListener('click',e=>{e.preventDefault(); setTimeout(()=>location.assign(e.currentTarget?.href||'http://127.0.0.1:8765/real.html'),50);});
+</script>

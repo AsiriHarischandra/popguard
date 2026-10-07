@@ -15,7 +15,7 @@
   const toggle = $('toggle');
   const paused = PG.isWhitelisted(host, whitelist);
   toggle.checked = !paused;
-  toggle.disabled = !host;
+  toggle.disabled = !host || PG.BUILTIN_TRUSTED.includes(host);
   $('offNote').hidden = !paused;
   toggle.addEventListener('change', async () => {
     const { whitelist = [] } = await chrome.storage.local.get('whitelist');

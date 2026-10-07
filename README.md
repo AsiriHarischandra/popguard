@@ -92,13 +92,13 @@ End-to-end tests load the real extension into Chromium with Playwright. They run
 
 ```bash
 npm install
-npm test            # 12 end-to-end tests
+npm test            # 13 end-to-end tests
 npm run screenshots # also regenerates docs/screenshots (demo data)
 ```
 
 The tests cover the following:
 
-- Pop-up blocking, including a real link still opening
+- Pop-up blocking, including a real link still opening, even inside shadow DOM
 - Overlay removal with click pass-through
 - Tab-under and fake-click blocking
 - Banner hiding without hiding normal content
