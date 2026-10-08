@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2.1.1
+- Published on Microsoft Edge Add-ons: https://microsoftedge.microsoft.com/addons/detail/pbiabfkcfocjnfljhpkipnelboohpbca
 - Fix: sign-in flows were blocked as redirects (e.g. Microsoft's account picker moving to login.live.com).
   Redirects and pop-ups to known sign-in/payment hosts are always allowed, and sign-in pages are trusted
 

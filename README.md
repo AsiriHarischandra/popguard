@@ -1,5 +1,7 @@
 # PopGuard
 
+[![Get PopGuard from Microsoft Edge Add-ons](https://img.shields.io/badge/Microsoft%20Edge%20Add--ons-Get%20PopGuard-0078D7?logo=microsoftedge&logoColor=white&style=for-the-badge)](https://microsoftedge.microsoft.com/addons/detail/pbiabfkcfocjnfljhpkipnelboohpbca)
+
 **A Chrome extension that stops websites from hijacking your clicks.** It blocks pop-ups, click-redirects and invisible ad overlays, blocks ads and trackers, and shows exactly what it stopped on a statistics dashboard.
 
 ![Dashboard](docs/screenshots/dashboard.png)
@@ -81,7 +83,9 @@ Design decisions worth calling out:
 
 ## Install
 
-**From a store:** coming soon. Submission guide and listing material are in [`docs/store/`](docs/store/PUBLISHING.md).
+**From the store (recommended):** [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/pbiabfkcfocjnfljhpkipnelboohpbca). Click **Get**; updates install automatically.
+
+Store listing material and the publishing guide are in [`docs/store/`](docs/store/PUBLISHING.md).
 
 **Developer mode:**
 
