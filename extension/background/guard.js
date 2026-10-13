@@ -44,6 +44,35 @@ const PGGuard = (() => {
     PGStats.record('tab', { tabId: srcTabId, site: PG.hostOf(srcUrl), target: targetUrl });
   }
 
+  // Safety net for timed redirects the page script couldn't cancel (e.g. started by an ad
+  // iframe): if the tab was sitting idle on a page for a while and a script - not the user -
+  // moved it to another site, go back.
+  const IDLE_MS = 10000;
+  const lastPage = new Map(); // tabId -> { url, t }
+  async function undoTimedRedirect(d) {
+    if (d.frameId !== 0) return;
+    const prev = lastPage.get(d.tabId);
+    lastPage.set(d.tabId, { url: d.url, t: d.timeStamp });
+    const q = d.transitionQualifiers || [];
+    // Script redirects arrive as 'client_redirect', but a redirect started by an ad iframe looks
+    // exactly like a link click ('link'). What gives both away is that nobody touched the tab.
+    const scripted = q.includes('client_redirect') || d.transitionType === 'link';
+    if (!prev || !scripted || q.includes('forward_back')) return;
+    if (!/^https?:/i.test(prev.url) || !/^https?:/i.test(d.url)) return;
+    if (/\.pdf([?#]|$)/i.test(prev.url)) return;                    // PDF viewer: clicks aren't visible to us
+    if (PG.siteOf(prev.url) === PG.siteOf(d.url) || PG.isSignIn(d.url)) return;
+    if (d.timeStamp - prev.t < IDLE_MS) return;                     // redirect during page load
+    const lc = lastClick.get(d.tabId);
+    if (lc && Date.now() - lc.t < IDLE_MS) return;                  // user was just active
+    const settings = await PG.getSettings();
+    if (!settings.blockRedirects) return;
+    const { whitelist = [] } = await chrome.storage.local.get('whitelist');
+    if (PG.isWhitelisted(PG.hostOf(prev.url), whitelist)) return;
+    lastPage.set(d.tabId, prev);
+    chrome.tabs.goBack(d.tabId).catch(() => chrome.tabs.update(d.tabId, { url: prev.url }));
+    PGStats.record('redirect', { tabId: d.tabId, site: PG.hostOf(prev.url), target: d.url });
+  }
+
   function listen() {
     chrome.webNavigation.onCreatedNavigationTarget.addListener(async (d) => {
       const src = await chrome.tabs.get(d.sourceTabId).catch(() => null);
@@ -63,7 +92,8 @@ const PGGuard = (() => {
     chrome.webNavigation.onCommitted.addListener((d) => {
       if (d.frameId === 0 && !/reload|auto_subframe/.test(d.transitionType)) PGStats.resetTab(d.tabId);
     });
-    chrome.tabs.onRemoved.addListener((id) => { lastClick.delete(id); watchBlank.delete(id); PGStats.forgetTab(id); });
+    chrome.webNavigation.onCommitted.addListener(undoTimedRedirect);
+    chrome.tabs.onRemoved.addListener((id) => { lastClick.delete(id); watchBlank.delete(id); lastPage.delete(id); PGStats.forgetTab(id); });
   }
 
   return { registerMain, listen, judgeNewTab, noteClick: (tabId, href) => lastClick.set(tabId, { href, t: Date.now() }) };

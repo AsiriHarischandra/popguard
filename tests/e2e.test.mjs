@@ -119,6 +119,50 @@ await test('still blocks the same kind of script redirect to an unknown site', a
   await r.done();
 });
 
+await test('blocks a timed redirect that fires long after the page loaded', async () => {
+  const p = await ctx.newPage();
+  await p.goto(SITE + 'timed-redirect.html');
+  await p.waitForTimeout(13000);
+  assert.equal(p.url(), SITE + 'timed-redirect.html');
+  await p.close();
+});
+
+await test('blocks a delayed meta-refresh redirect to another site', async () => {
+  const p = await ctx.newPage();
+  await p.goto(SITE + 'timed-meta.html');
+  await p.waitForTimeout(13000);
+  assert.equal(p.url(), SITE + 'timed-meta.html');
+  await p.close();
+});
+
+await test('undoes a timed redirect started by an ad iframe', async () => {
+  const p = await ctx.newPage();
+  await p.goto(SITE + 'iframe-timed.html');
+  await p.waitForTimeout(500);
+  await p.click('#ad', { position: { x: 50, y: 50 } }); // the user once clicked the ad box
+  await p.waitForTimeout(14000);
+  assert.equal(p.url(), SITE + 'iframe-timed.html');
+  await p.close();
+});
+
+await test('a link clicked after reading for a while still opens', async () => {
+  const p = await ctx.newPage();
+  await p.goto(SITE + 'article-link.html');
+  await p.waitForTimeout(12000);           // idle longer than the timed-redirect window
+  await p.click('#out');
+  await p.waitForTimeout(2500);
+  assert.equal(p.url(), AD + 'real.html');
+  await p.close();
+});
+
+await test('still allows normal redirects while a page is loading', async () => {
+  const p = await ctx.newPage();
+  await p.goto(SITE + 'load-redirect.html');
+  await p.waitForTimeout(2000);
+  assert.equal(p.url(), AD + 'real.html');
+  await p.close();
+});
+
 await test('removes an invisible overlay and passes the click to the Play button', async () => {
   const r = await visit('overlay.html', (p) => p.mouse.click(130, 110));
   assert.deepEqual(r.newTabs, []);

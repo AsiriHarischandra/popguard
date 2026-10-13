@@ -155,17 +155,38 @@
 
   // ---------- 3. click-redirect of the current tab ----------
   if (!OFF.redirects && window.top === window && window.navigation) {
+    // Timed redirects: a hidden timer moves the page to an ad site minutes after it loaded,
+    // with no click at all. Redirects while the page is still loading (http->https, region
+    // pages, short links) and ones soon after the user did something are left alone.
+    const IDLE_MS = 10000;
+    let lastActivity = 0;
+    for (const t of ['pointerdown', 'keydown', 'touchstart']) {
+      window.addEventListener(t, (e) => { if (e.isTrusted) lastActivity = Date.now(); }, true);
+    }
+    let allowOnce = null; // set by "Go anyway"
+
     window.navigation.addEventListener('navigate', (e) => {
       if (!e.cancelable || e.hashChange || e.downloadRequest) return;
       if (e.navigationType === 'reload' || e.navigationType === 'traverse') return;
       const dest = e.destination.url;
+      if (allowOnce && strip(allowOnce) === strip(dest)) { allowOnce = null; return; }
       if (sameSite(dest) || isSignIn(dest)) return;
-      if (!freshClick()) return;                 // only redirects caused by a click
-      if (e.userInitiated && !lastClick.openedSelf) return; // real link the user clicked
+      const goAnyway = () => { allowOnce = dest; lastClick.t = 0; location.href = dest; };
+
+      if (!freshClick()) {
+        if (e.userInitiated) return;                          // typed / real link / form
+        if (performance.now() < IDLE_MS) return;              // still loading
+        if (Date.now() - lastActivity < IDLE_MS) return;      // user was just active
+        e.preventDefault();
+        report('redirect', dest);
+        toast(`Blocked automatic redirect to <b>${esc(hostLabel(dest))}</b>`, 'Go anyway', goAnyway);
+        return;
+      }
+      if (e.userInitiated && !lastClick.openedSelf) return;   // real link the user clicked
       if (matchesClickedLink(dest) && !lastClick.openedSelf) return;
       e.preventDefault();
       report('redirect', dest);
-      toast(`Blocked redirect to <b>${esc(hostLabel(dest))}</b>`, 'Go anyway', () => { lastClick.t = 0; location.href = dest; });
+      toast(`Blocked redirect to <b>${esc(hostLabel(dest))}</b>`, 'Go anyway', goAnyway);
     });
   }
 })();

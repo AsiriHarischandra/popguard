@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.2
+- New: blocks timed redirects - pages that jump to another site minutes after loading, with no click
+  (script timers and delayed meta-refresh are cancelled in the page with a "Go anyway" notice;
+  redirects started by ad iframes are undone by the background script)
+- Redirects while a page is still loading, and redirects right after the user did something, are left alone
+
 ## 2.1.1
 - Published on Microsoft Edge Add-ons: https://microsoftedge.microsoft.com/addons/detail/pbiabfkcfocjnfljhpkipnelboohpbca
 - Fix: sign-in flows were blocked as redirects (e.g. Microsoft's account picker moving to login.live.com).
