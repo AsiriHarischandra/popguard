@@ -202,6 +202,26 @@ await test('blocks trackers and custom domains from the Filters page', async () 
   await wait(500);
 });
 
+await test("a company's own trackers are allowed on its own site, blocked everywhere else", async () => {
+  const check = (url, initiator) => sw.evaluate(({ url, initiator }) =>
+    chrome.declarativeNetRequest.testMatchOutcome({ url, initiator, type: 'script', tabId: -1 })
+      .then((r) => r.matchedRules.some((m) => m.rulesetId === 'trackers')), { url, initiator });
+  const cases = [
+    // [tracker, page it loads on, should it be blocked?]
+    ['https://snap.licdn.com/li.lms-analytics/insight.min.js', 'https://www.linkedin.com', false],
+    ['https://px.ads.linkedin.com/collect', 'https://www.linkedin.com', false],
+    ['https://snap.licdn.com/li.lms-analytics/insight.min.js', 'https://news-site.example', true],
+    ['https://www.google-analytics.com/analytics.js', 'https://accounts.google.com', false],
+    ['https://www.google-analytics.com/analytics.js', 'https://news-site.example', true],
+    ['https://www.facebook.com/tr?id=1', 'https://www.facebook.com', false],
+    ['https://www.facebook.com/tr?id=1', 'https://shop.example', true],
+    ['https://static.hotjar.com/c/hotjar.js', 'https://www.linkedin.com', true],  // other companies still blocked
+  ];
+  for (const [url, page, blocked] of cases) {
+    assert.equal(await check(url, page), blocked, `${url} on ${page} should be ${blocked ? 'blocked' : 'allowed'}`);
+  }
+});
+
 await test('records statistics by type, site and day', async () => {
   await wait(1500); // stats are batched once per second
   const stats = await storage.get('stats');
