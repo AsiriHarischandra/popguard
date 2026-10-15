@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.3
+- Fix: a company's own trackers are no longer blocked on that company's own sites
+  (e.g. LinkedIn's ads.linkedin.com / snap.licdn.com on linkedin.com). Blocking them there doesn't
+  stop cross-site tracking, and it broke LinkedIn account switching. They stay blocked on every other site.
+  Covers LinkedIn, Google, Microsoft, Facebook, X, TikTok, Pinterest, Snapchat, Yandex, Baidu, Mail.ru and HubSpot.
+
 ## 2.1.2
 - New: blocks timed redirects - pages that jump to another site minutes after loading, with no click
   (script timers and delayed meta-refresh are cancelled in the page with a "Go anyway" notice;
