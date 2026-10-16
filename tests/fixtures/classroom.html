@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Class stream</title>
+<!-- Like Google Classroom: a video post with an embedded player from another site. -->
+<h1>Week 3 - lecture video</h1>
+<iframe id="player" width="560" height="315" title="Video player" allowfullscreen></iframe>
+<p><button id="openyt">Open the video on its site</button></p>
+<script>
+  const q = new URLSearchParams(location.search);
+  document.getElementById('player').src = q.get('player') || 'about:blank';
+  document.getElementById('openyt').onclick = () => window.open(q.get('yt'), '_blank');
+</script>

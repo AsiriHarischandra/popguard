@@ -11,6 +11,7 @@
  */
 import { chromium } from 'playwright';
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -27,20 +28,31 @@ const AD = `http://127.0.0.1:${PORT}/`;
 
 // ---------- static server ----------
 const TYPES = { '.html': 'text/html', '.gif': 'image/gif', '.png': 'image/png', '.jpg': 'image/jpeg', '.txt': 'text/plain', '.js': 'text/javascript' };
-const server = http.createServer((req, res) => {
+const serve = (req, res) => {
   const file = path.join(FIX, decodeURIComponent(new URL(req.url, SITE).pathname));
   if (!file.startsWith(FIX) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
-});
+};
+const server = http.createServer(serve);
 await new Promise((r) => server.listen(PORT, r));
+// Real company domains for the "same company" tests. youtube.com and google.com only work over
+// HTTPS (HSTS), so they get a second server with a test-only certificate, mapped to 127.0.0.1.
+const TLS_PORT = 8766;
+const CERTS = path.join(ROOT, 'certs');
+const tlsServer = https.createServer({ key: fs.readFileSync(path.join(CERTS, 'test-key.pem')), cert: fs.readFileSync(path.join(CERTS, 'test-cert.pem')) }, serve);
+await new Promise((r) => tlsServer.listen(TLS_PORT, r));
+const YT = `https://www.youtube.com:${TLS_PORT}/`;
+const CLASSROOM = `https://classroom.google.com:${TLS_PORT}/`;
 
 // ---------- browser ----------
 const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'pg-')), {
   headless: true,
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
   viewport: { width: 1200, height: 800 },
-  args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--host-resolver-rules=MAP login.live.com 127.0.0.1'],
+  ignoreHTTPSErrors: true,
+  args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--ignore-certificate-errors', '--no-proxy-server',
+    '--host-resolver-rules=MAP login.live.com 127.0.0.1, MAP www.youtube.com 127.0.0.1, MAP classroom.google.com 127.0.0.1'],
 });
 let [sw] = ctx.serviceWorkers();
 if (!sw) sw = await ctx.waitForEvent('serviceworker');
@@ -54,10 +66,10 @@ const storage = {
 };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Opens a fixture, runs an action, and reports what happened. */
+/** Opens a fixture (a file name, or a full URL), runs an action, and reports what happened. */
 async function visit(file, action) {
   const page = await ctx.newPage();
-  await page.goto(SITE + file);
+  await page.goto(/^https?:/.test(file) ? file : SITE + file);
   await page.waitForTimeout(400);
   const before = new Set(ctx.pages());
   await action?.(page);
@@ -85,6 +97,57 @@ await test('still opens a real link the user clicked', async () => {
   const r = await visit('popunder.html', (p) => p.click('#real'));
   assert.deepEqual(r.newTabs, [AD + 'real.html']);
   await r.done();
+});
+
+const classroom = (base, player) =>
+  `${base}classroom.html?player=${encodeURIComponent(player)}&yt=${encodeURIComponent(YT + 'watch.html?v=abc')}`;
+
+await test("an embedded player's own buttons open its site (YouTube in Google Classroom)", async () => {
+  // The YouTube logo is a link, but the player opens it with "&t=42s" added.
+  let r = await visit(classroom(SITE, YT + 'player.html'), (p) => p.frameLocator('#player').locator('#logo').click());
+  assert.deepEqual(r.newTabs, [YT + 'watch.html?v=abc&t=42s']);
+  await r.done();
+  // "Watch on YouTube" isn't a link at all.
+  r = await visit(classroom(SITE, YT + 'player.html'), (p) => p.frameLocator('#player').locator('#watch').click());
+  assert.deepEqual(r.newTabs, [YT + 'watch.html?v=abc']);
+  await r.done();
+});
+
+await test('the same kind of button in an unknown iframe still cannot open tabs', async () => {
+  const r = await visit(classroom(SITE, AD + 'player.html'), (p) => p.frameLocator('#player').locator('#watch').click());
+  assert.deepEqual(r.newTabs, []);
+  await r.done();
+});
+
+await test("a company's sites can open each other (Google Classroom -> YouTube), other sites can't", async () => {
+  let r = await visit(classroom(CLASSROOM, 'about:blank'), (p) => p.click('#openyt'));
+  assert.deepEqual(r.newTabs, [YT + 'watch.html?v=abc']);
+  await r.done();
+  r = await visit(classroom(SITE, 'about:blank'), (p) => p.click('#openyt'));
+  assert.deepEqual(r.newTabs, []);
+  await r.done();
+});
+
+await test('a closed tab can be reopened from the notice, but only that tab', async () => {
+  const page = await ctx.newPage();
+  await page.goto(SITE + 'real.html');
+  await page.waitForTimeout(400);
+  const res = await sw.evaluate(async ({ src, target }) => {
+    const [srcTab] = await chrome.tabs.query({ url: src });
+    const tab = await chrome.tabs.create({ url: target, active: false });
+    await PGGuard.judgeNewTab(tab.id, srcTab.id, src, target);
+    await new Promise((r) => setTimeout(r, 500));
+    const closed = await chrome.tabs.get(tab.id).then(() => false, () => true);
+    const other = await PGGuard.reopen(srcTab.id, target.replace('ad.html', 'other.html'));
+    const ok = await PGGuard.reopen(srcTab.id, target);
+    const again = await PGGuard.reopen(srcTab.id, target);
+    return { closed, other, ok, again };
+  }, { src: SITE + 'real.html', target: AD + 'ad.html' });
+  assert.deepEqual(res, { closed: true, other: false, ok: true, again: false });
+  assert.ok(await page.$('popguard-notice'), 'no "Open anyway" notice on the page');
+  await wait(500);
+  for (const p of ctx.pages()) if (p.url() === AD + 'ad.html') await p.close();
+  await page.close();
 });
 
 await test('allows shortcut tiles built with web components (shadow DOM)', async () => {
@@ -360,6 +423,7 @@ if (process.env.SCREENSHOTS || process.argv.includes('--screenshots')) {
 
 await ctx.close();
 server.close();
+tlsServer.close();
 const failed = results.filter(([ok]) => !ok).length;
 console.log(`\n${results.length - failed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

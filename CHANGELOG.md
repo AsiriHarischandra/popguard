@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.4
+- Fix: buttons inside embedded players couldn't open their own site - e.g. the YouTube logo or
+  "Watch on YouTube" in a YouTube video on Google Classroom. The player opens the link itself
+  (with extras like `&t=42s`), so the new tab didn't match the clicked link exactly and was closed.
+  A click inside an embedded frame may now open that frame's own site, and a click inside a known
+  company's player may open that company's site. Unknown iframes and plain page clicks are checked as before
+- New: sites owned by the same company can open and redirect to each other (Google Classroom -> YouTube,
+  Outlook -> Teams, Instagram -> Facebook). The list is in `shared/families.js`; ad domains are not on it
+  and network blocking doesn't use it
+- New: when PopGuard closes a new tab, the page shows "Closed a new tab to ... - Open anyway". The notice
+  is drawn in a closed shadow root the page can't reach, and only the tab that was just closed can be reopened
+- Tests: 28 (YouTube player on a Classroom-like page, unknown iframe, same-company pop-up, reopen notice);
+  `www.youtube.com` and `classroom.google.com` are served locally over HTTPS with a test-only certificate
+- Docs: project overview in `docs/PopGuard.md`
+
 ## 2.1.3
 - Fix: a company's own trackers are no longer blocked on that company's own sites
   (e.g. LinkedIn's ads.linkedin.com / snap.licdn.com on linkedin.com). Blocking them there doesn't

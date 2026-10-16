@@ -82,4 +82,41 @@
       send({ type: 'click', href });
     }, true);
   }
+
+  // ---- "Closed a new tab - Open anyway" (top frame only) ----
+  // Drawn here in the isolated world, inside a closed shadow root, so the page can't press the
+  // button itself. The background only reopens the exact URL it just closed in this tab.
+  if (window.top !== window) return;
+  let noticeHost = null;
+  const showClosedNotice = (url) => {
+    noticeHost?.remove();
+    noticeHost = document.createElement('popguard-notice');
+    const root = noticeHost.attachShadow({ mode: 'closed' });
+    root.innerHTML = `
+      <style>
+        .t{position:fixed;right:16px;bottom:16px;z-index:2147483647;max-width:360px;
+           font:13px/1.4 system-ui,sans-serif;background:#111827;color:#f9fafb;border-radius:10px;
+           padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.35);display:flex;gap:10px;align-items:center}
+        .m{flex:1;overflow-wrap:anywhere} b{color:#93c5fd}
+        button{all:unset;cursor:pointer;padding:4px 8px;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;white-space:nowrap}
+        .x{background:transparent;color:#9ca3af;font-weight:400}
+      </style>
+      <div class="t" role="status"><div class="m">Closed a new tab to <b></b></div><button class="go">Open anyway</button><button class="x" aria-label="Dismiss">✕</button></div>`;
+    root.querySelector('b').textContent = PG.hostOf(url) || url;
+    const me = noticeHost;
+    root.querySelector('.go').addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
+      me.remove();
+      send({ type: 'reopenTab', url });
+    });
+    root.querySelector('.x').addEventListener('click', () => me.remove());
+    (document.body || document.documentElement).appendChild(me);
+    setTimeout(() => me.remove(), 12000);
+  };
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg?.type !== 'tabClosed') return;
+      PG.getSettings().then((s) => { if (s.showNotices) showClosedNotice(msg.url); });
+    });
+  } catch {}
 })();

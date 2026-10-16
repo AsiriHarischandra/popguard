@@ -17,7 +17,7 @@ On streaming and subtitle sites, clicking anywhere (the Play button, the page ba
 | **Tab-under** | The site reopens itself in a new tab and sends your current tab to an ad | Uses the Navigation API to cancel cross-site navigations right after a click when they don't match the clicked link |
 | **Fake clicks** | A script creates a hidden `<a target=_blank>` and calls `.click()` | Intercepts `HTMLAnchorElement.click` and `dispatchEvent` for cross-site anchors |
 | **Clean `window.open`** | A script grabs an unpatched `window.open` from a fresh iframe | Patches `contentWindow` so every frame gets the guarded version |
-| **Ad tabs that slip through** | A new tab opens anyway | The service worker closes tabs a page opened unless the user clicked that link |
+| **Ad tabs that slip through** | A new tab opens anyway | The service worker closes tabs a page opened unless the user clicked that link, and offers **Open anyway** |
 
 ## Features
 
@@ -79,6 +79,7 @@ Design decisions worth calling out:
 - **Settings without async in the page.** MAIN-world scripts can't read `chrome.storage`, so disabled features are passed in by registering tiny flag files (`content/flags/off-*.js`) ahead of `inject.js`.
 - **Whitelist at the network layer.** A priority-100 `allowAllRequests` dynamic rule beats every block rule, so trusted sites load untouched.
 - **Batched stats.** A busy page can trigger dozens of tracker blocks in a burst. Stats are buffered and written at most once per second through a promise chain, so writes never interleave.
+- **Same-company sites.** `shared/families.js` lists which sites belong to one company, so Google Classroom can open YouTube and a YouTube player's own button can open youtube.com. Ad domains aren't on it, and network blocking doesn't use it. It's registered in the page's MAIN world just before `inject.js` and not in the manifest, because Chrome injects a file only once per page.
 - **No dependencies.** Extension pages can't load CDN scripts under Manifest V3, so the chart is a small hand-written SVG renderer (`ui/chart.js`). The chart palette was checked for color-blind safety.
 
 ## Install
@@ -100,7 +101,7 @@ End-to-end tests load the real extension into Chromium with Playwright. They run
 
 ```bash
 npm install
-npm test               # 24 end-to-end tests
+npm test               # 28 end-to-end tests
 npm run build          # store upload: dist/popguard-<version>-store.zip
 npm run screenshots    # regenerates docs/screenshots (demo data)
 npm run store-images   # regenerates store screenshots and promo tiles
@@ -110,6 +111,8 @@ npm run icons          # renders the icons from docs/store/icon.svg
 The tests cover the following:
 
 - Pop-up blocking, including a real link still opening, even inside shadow DOM
+- Embedded players opening their own site (YouTube on a Classroom-like page), while unknown iframes still can't
+- Same-company sites opening each other, and the "Open anyway" notice for closed tabs
 - Overlay removal with click pass-through
 - Tab-under and fake-click blocking
 - Banner hiding without hiding normal content
@@ -127,7 +130,7 @@ extension/
   background/   service-worker.js · guard.js · filters.js · stats.js
   content/      inject.js (MAIN world) · content.js · cosmetic.js · flags/
   rules/        ads.json · trackers.json · betting.json
-  shared/       defaults.js (settings, kinds, helpers shared by every context)
+  shared/       defaults.js (settings, kinds, helpers shared by every context) · families.js (same-company sites)
   ui/           dashboard.* · chart.js · popup.* · theme.css
 tests/          e2e.test.mjs · fixtures/
 docs/           screenshots/
@@ -135,6 +138,7 @@ docs/           screenshots/
 
 ## Limitations and next steps
 
+- The same-company list covers the big platforms (Google, Microsoft, Meta, X, Amazon, Apple, Zoom). Other sites that open each other may still need **Open anyway** or a whitelist entry.
 - Built-in lists are small and hand-picked (about 140 rules). For full coverage, import EasyPrivacy or Peter Lowe's list from the Filters page.
 - Network-block statistics come from `onRuleMatchedDebug` in developer mode, and from `getMatchedRules()` polled once a minute in store installs (Chrome allows 20 calls per 10 minutes). Store installs therefore don't show *which* domain was blocked, and Chrome stops reporting the tab once it's closed, so those blocks count by type but not by site.
 - Redirects started by cross-origin iframes, or more than 2 seconds after a click, aren't intercepted.

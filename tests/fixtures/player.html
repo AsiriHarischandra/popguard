@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Player</title>
+<!-- Like the YouTube embed: its own buttons open the video on the player's site. -->
+<style>body{margin:0;height:100vh;background:#111;color:#fff;font:14px system-ui}a,div{display:inline-block;margin:12px;padding:8px;background:#333;color:#fff}</style>
+<a id="logo" href="watch.html?v=abc" target="_blank">YouTube</a>
+<div id="watch" role="button">Watch on YouTube</div>
+<script>
+  // The logo is a real link, but the player opens it itself with the current time added.
+  document.getElementById('logo').addEventListener('click', (e) => {
+    e.preventDefault();
+    window.open(new URL('watch.html?v=abc&t=42s', location.href).href, '_blank');
+  });
+  // "Watch on YouTube" isn't a link at all.
+  document.getElementById('watch').addEventListener('click', () => {
+    window.open(new URL('watch.html?v=abc', location.href).href, '_blank');
+  });
+</script>
