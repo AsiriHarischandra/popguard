@@ -48,6 +48,20 @@ PG.siteOf = (hostOrUrl) => {
   return p.slice(twoPartTld ? -3 : -2).join('.');
 };
 
+/**
+ * True when two URLs belong to the same site, or to sites one company owns (see families.js),
+ * e.g. classroom.google.com and youtube.com.
+ */
+PG.sameOwner = (a, b) => {
+  const sa = PG.siteOf(a || ''), sb = PG.siteOf(b || '');
+  if (!sa || !sb) return false;
+  if (sa === sb) return true;
+  const own = globalThis.__popguardFamilies?.ownerOf;
+  return !!own && !!own(sa) && own(sa) === own(sb);
+};
+/** True when the URL is on a site a known company owns (YouTube, Microsoft, ...). */
+PG.isKnownOwner = (u) => !!globalThis.__popguardFamilies?.ownerOf(PG.siteOf(u || ''));
+
 /** Browser start pages are web pages too (Edge New Tab = ntp.msn.com). PopGuard never touches them. */
 PG.BUILTIN_TRUSTED = ['ntp.msn.com', 'ntp.msn.cn',
   // sign-in / developer pages: no ads, and their script-driven redirects must never be blocked

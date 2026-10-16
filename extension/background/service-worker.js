@@ -1,5 +1,5 @@
 /* PopGuard service worker: wires the modules together. */
-importScripts('../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js');
+importScripts('../shared/families.js', '../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js');
 
 async function syncEverything() {
   await PGFilters.applyRulesets();
@@ -32,8 +32,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const site = PG.hostOf(sender.tab?.url || sender.url || '');
   switch (msg.type) {
     case 'click':
-      if (tabId != null) PGGuard.noteClick(tabId, msg.href);
+      if (tabId != null) PGGuard.noteClick(tabId, msg.href, sender.frameId ? sender.url : null);
       break;
+    case 'reopenTab': // "Open anyway" on the closed-tab notice
+      if (tabId != null) PGGuard.reopen(tabId, msg.url).then((ok) => sendResponse({ ok }));
+      return true;
     case 'blocked': // from inject.js (via content.js) or content.js itself
       PGStats.record(msg.kind, { tabId, site, target: msg.url });
       break;

@@ -2,6 +2,9 @@
 // Blocks: window.open pop-ups/pop-unders, fake programmatic link clicks,
 // and "tab-under" / click-redirects of the current tab to another site.
 (() => {
+  // Same-company site list from shared/families.js (registered just before this file).
+  const FAM = window.__popguardFamilies;
+  try { delete window.__popguardFamilies; } catch {}
   if (window.__popguardActive) return;
   Object.defineProperty(window, '__popguardActive', { value: true });
 
@@ -26,14 +29,28 @@
   const isSignIn = (u) => {
     try { const h = new URL(u).hostname; return SIGN_IN.some((d) => h === d || h.endsWith('.' + d)); } catch { return false; }
   };
+  // Same site, or sites one company owns (Google Classroom -> YouTube): never an ad trick.
+  const sameOwner = (a, b) => {
+    const sa = siteOf(a), sb = siteOf(b);
+    if (!sa || !sb) return false;
+    if (sa === sb) return true;
+    const oa = FAM ? FAM.ownerOf(sa) : null;
+    return !!oa && oa === FAM.ownerOf(sb);
+  };
   const sameSite = (u) => {
     if (!u || isSafeScheme(u)) return true;
     if (u === 'about:blank') return false;
-    return siteOf(u) === siteOf(here.href);
+    return sameOwner(u, here.href);
   };
   const strip = (u) => (u || '').split('#')[0].replace(/\/$/, '');
   const freshClick = () => Date.now() - lastClick.t < CLICK_WINDOW_MS;
   const matchesClickedLink = (u) => freshClick() && lastClick.href && strip(lastClick.href) === strip(u);
+  // Players often open their link with extras (YouTube adds "&t=42s"). For a known company's
+  // site the clicked link only has to point at that company; anywhere else it must match exactly,
+  // because pop-under scripts like to open an ad on the same host as the link you clicked.
+  const knownOwner = (u) => !!(FAM && FAM.ownerOf(siteOf(u)));
+  const clickedLinkTo = (u) => matchesClickedLink(u) ||
+    (freshClick() && !!lastClick.href && knownOwner(u) && sameOwner(lastClick.href, u));
   // composedPath() sees links inside shadow DOM (web-component pages like Edge's New Tab)
   const linkOf = (e) => {
     for (const n of (e.composedPath ? e.composedPath() : [e.target])) {
@@ -108,7 +125,7 @@
       if (freshClick()) lastClick.openedSelf = true; // possible tab-under setup
       return realOpen.apply(window, arguments);
     }
-    if (matchesClickedLink(u)) return realOpen.apply(window, arguments);
+    if (clickedLinkTo(u)) return realOpen.apply(window, arguments);
     report('popup', u);
     if (u !== 'about:blank') {
       toast(`Blocked pop-up to <b>${esc(hostLabel(u))}</b>`, 'Open anyway', () => realOpen.call(window, u, '_blank'));
@@ -135,7 +152,7 @@
   const suspiciousAnchor = (a) => {
     const u = abs(a.getAttribute('href'));
     if (!u || sameSite(u)) return false;
-    return !matchesClickedLink(u);
+    return !clickedLinkTo(u);
   };
   const realAClick = HTMLAnchorElement.prototype.click;
   HTMLAnchorElement.prototype.click = function () {
