@@ -1,6 +1,7 @@
 # PopGuard
 
 [![Get PopGuard from Microsoft Edge Add-ons](https://img.shields.io/badge/Microsoft%20Edge%20Add--ons-Get%20PopGuard-0078D7?logo=microsoftedge&logoColor=white&style=for-the-badge)](https://microsoftedge.microsoft.com/addons/detail/pbiabfkcfocjnfljhpkipnelboohpbca)
+[![Tests](https://github.com/AsiriHarischandra/popguard/actions/workflows/test.yml/badge.svg)](https://github.com/AsiriHarischandra/popguard/actions/workflows/test.yml)
 
 **A Chrome extension that stops websites from hijacking your clicks.** It blocks pop-ups, click-redirects and invisible ad overlays, blocks ads and trackers, and shows exactly what it stopped on a statistics dashboard.
 
@@ -107,6 +108,8 @@ npm run screenshots    # regenerates docs/screenshots (demo data)
 npm run store-images   # regenerates store screenshots and promo tiles
 npm run icons          # renders the icons from docs/store/icon.svg
 ```
+
+They also run automatically on GitHub for every pull request and every push to `main` (see [`.github/workflows/test.yml`](.github/workflows/test.yml)), which uploads the store zip as a build artifact.
 
 The tests cover the following:
 

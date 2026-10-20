@@ -1,0 +1,43 @@
+# Runs the end-to-end tests on every pull request and on every push to main.
+# The real extension is loaded into Chromium (Playwright), so this checks the same thing as `npm test`.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: e2e tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build store package
+        run: npm run build
+
+      - name: Upload store package
+        uses: actions/upload-artifact@v4
+        with:
+          name: popguard-store-zip
+          path: dist/*.zip
+          retention-days: 14

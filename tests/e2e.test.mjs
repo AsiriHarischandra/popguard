@@ -48,7 +48,8 @@ const CLASSROOM = `https://classroom.google.com:${TLS_PORT}/`;
 // ---------- browser ----------
 const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'pg-')), {
   headless: true,
-  ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+  // Extensions need full Chromium; the default headless shell can't load them.
+  ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : { channel: 'chromium' }),
   viewport: { width: 1200, height: 800 },
   ignoreHTTPSErrors: true,
   args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--ignore-certificate-errors', '--no-proxy-server',
