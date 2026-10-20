@@ -150,9 +150,9 @@
 
   // ---- start ----
   const load = async () => {
-    const { whitelist = [], cosmeticFilters = [] } = await chrome.storage.local.get(['whitelist', 'cosmeticFilters']);
+    const { cosmeticFilters = [] } = await chrome.storage.local.get('cosmeticFilters');
     const settings = await PG.getSettings();
-    whitelisted = PG.isWhitelisted(host, whitelist);
+    whitelisted = PG.isWhitelisted(host, await PG.getAllowList());
     enabled = settings.hideBanners;
     userHides = PG.cosmeticSelectorsFor(host, cosmeticFilters);
     writeCss();
@@ -168,6 +168,6 @@
     else start();
   });
   chrome.storage.onChanged.addListener((c, area) => {
-    if (area === 'local' && (c.cosmeticFilters || c.whitelist || c.settings)) load();
+    if (area === 'local' && (c.cosmeticFilters || c.whitelist || c.pausedSites || c.settings)) load();
   });
 })();

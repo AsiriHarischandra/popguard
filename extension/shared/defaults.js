@@ -75,6 +75,16 @@ PG.isSignIn = (url) => {
   return !!h && PG.SIGN_IN.some((d) => h === d || h.endsWith('.' + d));
 };
 
+/** Sites paused from the popup ({ host: untilMs }) whose pause hasn't run out yet. */
+PG.activePauses = (pausedSites, now = Date.now()) =>
+  Object.keys(pausedSites || {}).filter((h) => pausedSites[h] > now);
+
+/** Whitelist plus sites paused right now: PopGuard leaves all of these alone. */
+PG.getAllowList = async () => {
+  const { whitelist = [], pausedSites = {} } = await chrome.storage.local.get(['whitelist', 'pausedSites']);
+  return [...new Set([...whitelist, ...PG.activePauses(pausedSites)])];
+};
+
 PG.isWhitelisted = (host, whitelist) =>
   !!host && [...(whitelist || []), ...PG.BUILTIN_TRUSTED].some((d) => host === d || host.endsWith('.' + d));
 

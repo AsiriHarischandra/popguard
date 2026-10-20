@@ -34,8 +34,9 @@ const PGFilters = (() => {
   }
 
   async function doRebuild() {
-    const { whitelist = [], customDomains = [], importedLists = [] } =
-      await chrome.storage.local.get(['whitelist', 'customDomains', 'importedLists']);
+    const { customDomains = [], importedLists = [] } =
+      await chrome.storage.local.get(['customDomains', 'importedLists']);
+    const whitelist = await PG.getAllowList(); // whitelist + sites paused from the popup
     const rules = [];
     const trusted = [...whitelist, ...PG.BUILTIN_TRUSTED];
     if (trusted.length) {

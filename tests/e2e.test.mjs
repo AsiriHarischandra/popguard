@@ -331,6 +331,45 @@ await test('imports an EasyList / hosts style filter list', async () => {
   await dash.close();
 });
 
+await test('"Pause for 1 hour" turns PopGuard off on a site until the pause runs out', async () => {
+  await storage.set({ pausedSites: { localhost: Date.now() + 3600e3 } });
+  await wait(800);
+  let r = await visit('popunder.html', (p) => p.click('#play'));
+  assert.equal(r.newTabs.length, 1, 'pop-up should be allowed while paused');
+  await r.done();
+  // The pause runs out: the expiry alarm drops it and protection is back.
+  await storage.set({ pausedSites: { localhost: Date.now() - 1 } });
+  await wait(800);
+  assert.deepEqual(await storage.get('pausedSites'), {});
+  r = await visit('popunder.html', (p) => p.click('#play'));
+  assert.deepEqual(r.newTabs, []);
+  await r.done();
+});
+
+await test('popup shows the last blocks on the page, and can pause and resume the site', async () => {
+  const r = await visit('popunder.html', (p) => p.click('#play'));
+  const tabId = await sw.evaluate((u) => chrome.tabs.query({ url: u }).then(([t]) => t.id), SITE + 'popunder.html');
+  let pop = await ctx.newPage();
+  await pop.goto(`chrome-extension://${extId}/ui/popup.html?tab=${tabId}`);
+  await pop.waitForTimeout(500);
+  assert.equal(await pop.isVisible('#recent'), true, 'recent blocks list is hidden');
+  assert.match(await pop.textContent('#recentList'), /Pop-up windows/);
+  await pop.click('#pause');
+  await wait(600);
+  const until = (await storage.get('pausedSites'))?.localhost || 0;
+  assert.ok(Math.abs(until - Date.now() - 3600e3) < 60e3, 'site not paused for about an hour');
+  pop = await ctx.newPage();
+  await pop.goto(`chrome-extension://${extId}/ui/popup.html?tab=${tabId}`);
+  await pop.waitForTimeout(500);
+  assert.match(await pop.textContent('#offText'), /Paused here until/);
+  assert.equal(await pop.isChecked('#toggle'), false);
+  await pop.click('#resume');
+  await wait(600);
+  assert.deepEqual(await storage.get('pausedSites'), {});
+  for (const p of ctx.pages()) if (p.url().includes('popup.html')) await p.close();
+  await r.done();
+});
+
 await test('whitelisted sites are left alone', async () => {
   await storage.set({ whitelist: ['localhost'] });
   await wait(800);

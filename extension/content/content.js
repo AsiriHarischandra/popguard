@@ -6,9 +6,8 @@
   let enabled = true;
   const host = PG.hostOf(location.href);
   try {
-    chrome.storage.local.get('whitelist', async ({ whitelist = [] }) => {
-      const settings = await PG.getSettings();
-      enabled = settings.removeOverlays && !PG.isWhitelisted(host, whitelist);
+    Promise.all([PG.getSettings(), PG.getAllowList()]).then(([settings, allow]) => {
+      enabled = settings.removeOverlays && !PG.isWhitelisted(host, allow);
     });
   } catch {}
 
