@@ -38,6 +38,7 @@ On streaming and subtitle sites, clicking anywhere (the Play button, the page ba
 
 - **Statistics dashboard:** blocks per day (stacked by category, with a hover tooltip and a table view), totals, top sites, most-blocked domains, and a breakdown by type. Supports light and dark mode.
 - **Custom filter lists:** import EasyList-style `||domain^`, hosts-file or plain domain lists by URL; add your own blocked domains and element-hiding filters (`site.com##.selector`)
+- **Pause for 1 hour:** if a site doesn't work, one click in the popup turns PopGuard off there, and it turns back on by itself. The popup also lists the last few things blocked on the page, so you can see what broke it
 - **Whitelist:** trusted sites get no blocking at all (a high-priority `allowAllRequests` rule plus excluded content-script matches)
 - **Settings:** toggle each protection, export and import settings, reset statistics
 
@@ -102,7 +103,7 @@ End-to-end tests load the real extension into Chromium with Playwright. They run
 
 ```bash
 npm install
-npm test               # 28 end-to-end tests
+npm test               # 30 end-to-end tests
 npm run build          # store upload: dist/popguard-<version>-store.zip
 npm run screenshots    # regenerates docs/screenshots (demo data)
 npm run store-images   # regenerates store screenshots and promo tiles
@@ -116,6 +117,7 @@ The tests cover the following:
 - Pop-up blocking, including a real link still opening, even inside shadow DOM
 - Embedded players opening their own site (YouTube on a Classroom-like page), while unknown iframes still can't
 - Same-company sites opening each other, and the "Open anyway" notice for closed tabs
+- Pausing a site for an hour, the pause running out, and the popup's pause / resume buttons
 - Overlay removal with click pass-through
 - Tab-under and fake-click blocking
 - Banner hiding without hiding normal content
@@ -130,7 +132,7 @@ The tests cover the following:
 ```
 extension/
   manifest.json
-  background/   service-worker.js · guard.js · filters.js · stats.js
+  background/   service-worker.js · guard.js · filters.js · stats.js · netstats.js · pause.js
   content/      inject.js (MAIN world) · content.js · cosmetic.js · flags/
   rules/        ads.json · trackers.json · betting.json
   shared/       defaults.js (settings, kinds, helpers shared by every context) · families.js (same-company sites)

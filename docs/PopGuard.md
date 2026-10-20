@@ -1,7 +1,7 @@
 # PopGuard: Click Redirect & Pop-up Blocker
 
 **Author:** Asiri Harischandra
-**Current version:** 2.1.4
+**Current version:** 2.2.0
 **Store:** [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/pbiabfkcfocjnfljhpkipnelboohpbca)
 **Source code:** [github.com/AsiriHarischandra/popguard](https://github.com/AsiriHarischandra/popguard)
 **License:** MIT
@@ -35,6 +35,7 @@ Ordinary ad blockers are good at blocking ad *requests*. Click-hijacking sites u
 - Blocks **timed redirects** that fire minutes after a page loads (2.1.2)
 - Removes invisible click-catching overlays
 - Shows a small notice for every block, with an **Open anyway** / **Go anyway** button in case it was wanted, including for tabs the background closed (2.1.4)
+- **Pause for 1 hour:** if a site doesn't work, one click in the popup turns PopGuard off there; it turns back on by itself (2.2.0)
 
 ### Ad and tracker blocking
 - Three built-in lists, each can be switched on or off:
@@ -46,7 +47,7 @@ Ordinary ad blockers are good at blocking ad *requests*. Click-hijacking sites u
 - **Right-click → "PopGuard: Hide this ad"** for anything the automatic rules miss
 
 ### Control and insight
-- **Popup:** blocks on this page, today and all time, plus a **Protect this site** switch
+- **Popup:** blocks on this page, today and all time, the **last few things blocked on this page** (to see what broke a site), a **Protect this site** switch and **Pause for 1 hour**
 - **Dashboard:** blocks per day (stacked chart with tooltips and a table view), top sites, most-blocked domains, breakdown by type, light and dark mode
 - **Filters:** import filter lists by URL (EasyList-style `||domain^`, hosts files, plain domain lists), your own blocked domains, and element-hiding rules (`site.com##.selector`)
 - **Whitelist:** trusted sites get no blocking at all
@@ -69,7 +70,8 @@ Ordinary ad blockers are good at blocking ad *requests*. Click-hijacking sites u
 | I want to… | Do this |
 |---|---|
 | See what was blocked on this page | Click the shield icon |
-| Turn PopGuard off for one site | Shield icon → switch off **Protect this site** |
+| A site isn't working | Shield icon → **Pause for 1 hour** (it turns back on by itself) |
+| Turn PopGuard off for one site for good | Shield icon → switch off **Protect this site** |
 | Hide an ad PopGuard missed | Right-click the ad → **PopGuard: Hide this ad** |
 | Get back ads I hid by mistake | Shield icon → **Unhide ads here** |
 | Allow a blocked pop-up, tab or redirect | Click **Open anyway** / **Go anyway** on the notice |
@@ -92,6 +94,7 @@ Service worker (background)
   filters.js    built-in lists, whitelist, custom and imported rules
   stats.js      batched statistics
   netstats.js   counts network blocks
+  pause.js      "Pause for 1 hour": paused sites act like whitelisted ones until an alarm ends the pause
   families.js   which sites belong to the same company (shared with inject.js)
         │
         ▼
@@ -132,11 +135,12 @@ PopGuard **collects nothing**: no account, no server, no analytics. Settings, fi
 
 The extension is tested end to end with **Playwright**: the real extension runs in Chromium against test pages that copy each trick. `localhost` and `127.0.0.1` act as two different websites; `www.youtube.com` and `classroom.google.com` are mapped to a local HTTPS server with a test-only certificate.
 
-**28 automated tests** cover:
+**30 automated tests** cover (they also run on GitHub for every pull request):
 - pop-ups blocked, while real links still open (including links inside web components)
 - embedded players opening their own site (YouTube in Google Classroom), while unknown iframes still can't
 - same-company sites opening each other, while other sites can't
 - the "Open anyway" notice for closed tabs, which reopens only the tab that was closed
+- pausing a site for an hour, the pause running out, and the popup's pause / resume buttons and recent-blocks list
 - overlays removed, with the click passed through
 - click-redirects, tab-unders, fake clicks and the iframe `window.open` trick
 - timed redirects (script timer, meta refresh, ad iframe), while normal loading redirects and links clicked after reading still work
@@ -160,7 +164,7 @@ npm run icons          # render icons from docs/store/icon.svg
 ```
 extension/
   manifest.json
-  background/   service-worker.js · guard.js · filters.js · stats.js · netstats.js
+  background/   service-worker.js · guard.js · filters.js · stats.js · netstats.js · pause.js
   content/      inject.js · content.js · cosmetic.js · flags/
   rules/        ads.json · trackers.json · betting.json
   shared/       defaults.js · families.js
@@ -169,6 +173,7 @@ tests/          e2e.test.mjs · fixtures/ · certs/ (test-only certificate)
 scripts/        build.mjs · store-images.mjs · render-icons.mjs
 docs/           PopGuard.md · screenshots/ · store/ (listing text, images, publishing guide)
 PRIVACY.md · CHANGELOG.md · README.md · LICENSE
+.github/workflows/test.yml   runs the tests on GitHub
 ```
 
 ## 9. Version history
@@ -185,11 +190,12 @@ PRIVACY.md · CHANGELOG.md · README.md · LICENSE
 | 2.1.2 | Blocks timed redirects |
 | 2.1.3 | A company's own trackers allowed on its own sites (fixes LinkedIn account switching) |
 | 2.1.4 | Embedded players can open their own site (fixes the YouTube button on Google Classroom videos); same-company sites can open each other; "Open anyway" for closed tabs |
+| 2.2.0 | "Pause for 1 hour" and "last blocked on this page" in the popup; tests run automatically on GitHub |
 
 ## 10. Development workflow
 
 - Changes are made on a **branch** and merged into `main` through a **pull request**. `main` is protected by a GitHub ruleset: pull request required, no force pushes, no deletion.
-- Every change comes with a test, and all tests must pass before release.
+- Every change comes with a test. GitHub Actions runs all tests on every pull request (and builds the store zip), so a broken change shows a red ❌ before it is merged.
 - A release means: raise the version in `manifest.json`, run `npm test` and `npm run build`, then upload the zip in **Partner Center → Update**.
 
 ## 11. Known limitations and next steps
@@ -199,4 +205,4 @@ PRIVACY.md · CHANGELOG.md · README.md · LICENSE
 - Store installs can't show *which* domain a network block hit (a browser limitation), only the type and the site.
 - Redirects started by cross-origin frames are undone after the fact rather than prevented.
 - The registrable-domain check is a heuristic, not the full Public Suffix List.
-- Planned: Chrome Web Store release, cosmetic rules from imported lists, a short demo video for the store page.
+- Planned: one-click EasyList / EasyPrivacy subscriptions that update themselves, Chrome Web Store release, cosmetic rules from imported lists, a short demo video for the store page.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.0
+- New: **Pause for 1 hour** in the popup ("Something not working here?"). The site is treated like a
+  whitelisted one until the pause runs out, then protection turns back on by itself (an alarm ends it).
+  The popup shows "Paused here until 3:45 PM - Resume now" while it lasts
+- New: the popup lists the **last few things blocked on this page**, so it's easy to see which block broke a site
+- Tests run on GitHub Actions for every pull request and push to `main`; the store zip is uploaded as a build artifact
+- Tests: 30
+
 ## 2.1.4
 - Fix: buttons inside embedded players couldn't open their own site - e.g. the YouTube logo or
   "Watch on YouTube" in a YouTube video on Google Classroom. The player opens the link itself
