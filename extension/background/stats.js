@@ -9,6 +9,8 @@ const PGStats = (() => {
   const MAX_DAYS = 90;
   const MAX_KEYS = 300;
   const tabCounts = new Map();
+  const tabRecent = new Map(); // tabId -> last few blocks on that page, newest first
+  const RECENT = 5;
   let pending = [];
   let timer = null;
   let chain = Promise.resolve();
@@ -55,13 +57,17 @@ const PGStats = (() => {
       pending.push({ kind, site: PG.hostOf('https://' + site) || site, target: target ? PG.hostOf(target.includes('://') ? target : 'https://' + target) : '', day: PG.today() });
       if (tabId != null && tabId >= 0) {
         tabCounts.set(tabId, (tabCounts.get(tabId) || 0) + 1);
+        const t = pending[pending.length - 1].target;
+        tabRecent.set(tabId, [{ kind, target: t, at: Date.now() }, ...(tabRecent.get(tabId) || [])].slice(0, RECENT));
         setBadge(tabId);
       }
       if (!timer) timer = setTimeout(() => { chain = chain.then(flush).catch(() => {}); }, 1000);
     },
     tabCount: (tabId) => tabCounts.get(tabId) || 0,
-    resetTab(tabId) { tabCounts.delete(tabId); setBadge(tabId); },
-    forgetTab(tabId) { tabCounts.delete(tabId); },
+    /** The last few blocks on the page this tab shows, newest first: [{ kind, target, at }] */
+    tabRecent: (tabId) => tabRecent.get(tabId) || [],
+    resetTab(tabId) { tabCounts.delete(tabId); tabRecent.delete(tabId); setBadge(tabId); },
+    forgetTab(tabId) { tabCounts.delete(tabId); tabRecent.delete(tabId); },
     async reset() { pending = []; await chrome.storage.local.set({ stats: empty() }); },
   };
 })();

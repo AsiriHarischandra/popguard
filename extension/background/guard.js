@@ -13,7 +13,7 @@ const PGGuard = (() => {
 
   async function registerMain() {
     const settings = await PG.getSettings();
-    const { whitelist = [] } = await chrome.storage.local.get('whitelist');
+    const whitelist = await PG.getAllowList();
     try { await chrome.scripting.unregisterContentScripts({ ids: [MAIN_ID] }); } catch {}
     if (!settings.blockPopups && !settings.blockRedirects) return;
     const js = [];
@@ -34,8 +34,7 @@ const PGGuard = (() => {
     if (!/^https?:/i.test(srcUrl)) return;
     const settings = await PG.getSettings();
     if (!settings.blockPopups) return;
-    const { whitelist = [] } = await chrome.storage.local.get('whitelist');
-    if (PG.isWhitelisted(PG.hostOf(srcUrl), whitelist)) return;
+    if (PG.isWhitelisted(PG.hostOf(srcUrl), await PG.getAllowList())) return;
     if (PG.sameOwner(targetUrl, srcUrl)) return; // same site, or the same company (Classroom -> YouTube)
     if (PG.isSignIn(targetUrl)) return; // "Sign in with ..." windows
     if (userOpened(srcTabId, targetUrl)) return;
@@ -103,8 +102,7 @@ const PGGuard = (() => {
     if (lc && Date.now() - lc.t < IDLE_MS) return;                  // user was just active
     const settings = await PG.getSettings();
     if (!settings.blockRedirects) return;
-    const { whitelist = [] } = await chrome.storage.local.get('whitelist');
-    if (PG.isWhitelisted(PG.hostOf(prev.url), whitelist)) return;
+    if (PG.isWhitelisted(PG.hostOf(prev.url), await PG.getAllowList())) return;
     lastPage.set(d.tabId, prev);
     chrome.tabs.goBack(d.tabId).catch(() => chrome.tabs.update(d.tabId, { url: prev.url }));
     PGStats.record('redirect', { tabId: d.tabId, site: PG.hostOf(prev.url), target: d.url });

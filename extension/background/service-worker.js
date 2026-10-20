@@ -1,10 +1,11 @@
 /* PopGuard service worker: wires the modules together. */
-importScripts('../shared/families.js', '../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js');
+importScripts('../shared/families.js', '../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js', 'pause.js');
 
 async function syncEverything() {
   await PGFilters.applyRulesets();
   await PGFilters.rebuildDynamic();
   await PGGuard.registerMain();
+  await PGPause.schedule();
 }
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
@@ -17,11 +18,13 @@ chrome.runtime.onStartup.addListener(syncEverything);
 chrome.storage.onChanged.addListener((c, area) => {
   if (area !== 'local') return;
   if (c.settings) { PGFilters.applyRulesets(); PGGuard.registerMain(); }
-  if (c.whitelist) PGGuard.registerMain();
-  if (c.whitelist || c.customDomains || c.importedLists) PGFilters.rebuildDynamic();
+  if (c.whitelist || c.pausedSites) PGGuard.registerMain();
+  if (c.whitelist || c.pausedSites || c.customDomains || c.importedLists) PGFilters.rebuildDynamic();
+  if (c.pausedSites) PGPause.schedule();
 });
 
 PGGuard.listen();
+PGPause.listen();
 
 // ---- Network blocks -> statistics (see netstats.js for the two modes) ----
 PGNetStats.start();
@@ -44,8 +47,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       PGStats.record('banner', { tabId, site, target: msg.url });
       break;
     case 'tabCount':
-      sendResponse({ count: PGStats.tabCount(msg.tabId) });
+      sendResponse({ count: PGStats.tabCount(msg.tabId), recent: PGStats.tabRecent(msg.tabId) });
       break;
+    case 'pauseSite': // popup: "Pause for 1 hour" / "Resume now"
+      (msg.resume ? PGPause.resume(msg.host) : PGPause.pause(msg.host)).then(() => sendResponse({ ok: true }));
+      return true;
     case 'pollNetStats': // popup / dashboard opened: pull in the latest network blocks first
       (PGNetStats.mode === 'poll' ? PGNetStats.poll() : Promise.resolve(0)).then((n) => sendResponse({ n }));
       return true;
