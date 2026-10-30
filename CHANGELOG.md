@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.1
+- Fix: right-click "Hide this ad" on a normal link hid every link to that site (it saved `a[href*="site"]`).
+  That broad rule is now only used when the site is an ad network (on PopGuard's ad / betting lists, your custom
+  domains or imported lists, or with ad words in its name); otherwise only the clicked element is hidden
+- Fix: "Hide this ad" inside an embedded frame hid every frame from that site (e.g. every embedded video).
+  Now only the clicked frame, unless the frame is from an ad network
+- Fix: rules are no longer built on generated IDs (like `promo-a8f3k2b7`) that change on every visit
+- Tests: 34 (first tests for "Hide this ad")
+
 ## 2.2.0
 - New: **Pause for 1 hour** in the popup ("Something not working here?"). The site is treated like a
   whitelisted one until the pause runs out, then protection turns back on by itself (an alarm ends it).

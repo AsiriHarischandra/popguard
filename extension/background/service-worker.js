@@ -43,6 +43,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'blocked': // from inject.js (via content.js) or content.js itself
       PGStats.record(msg.kind, { tabId, site, target: msg.url });
       break;
+    case 'isAdHost': // "Hide this ad": is the clicked link / frame an ad network?
+      PGFilters.isAdHost(msg.host).then((ad) => sendResponse({ ad }));
+      return true;
     case 'hidden':
       PGStats.record('banner', { tabId, site, target: msg.url });
       break;
@@ -70,12 +73,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 // ---- Right-click "Hide this ad" ----
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== 'popguard-hide' || !tab?.id) return;
+// (a named function so the tests can run exactly what the menu click runs)
+function onHideMenu(info, tab) {
+  if (info.menuItemId !== 'popguard-hide' || !tab?.id) return Promise.resolve(null);
+  const send = (msg, frameId) => chrome.tabs.sendMessage(tab.id, msg, { frameId }).catch(() => null);
   if (info.frameId) {
-    chrome.tabs.sendMessage(tab.id, { type: 'hideFrame', url: info.frameUrl }, { frameId: 0 }).catch(() => {});
-    chrome.tabs.sendMessage(tab.id, { type: 'pickHide' }, { frameId: info.frameId }).catch(() => {});
-  } else {
-    chrome.tabs.sendMessage(tab.id, { type: 'pickHide' }, { frameId: 0 }).catch(() => {});
+    return Promise.all([send({ type: 'hideFrame', url: info.frameUrl }, 0), send({ type: 'pickHide' }, info.frameId)]);
   }
-});
+  return send({ type: 'pickHide' }, 0);
+}
+chrome.contextMenus.onClicked.addListener((info, tab) => { onHideMenu(info, tab); });

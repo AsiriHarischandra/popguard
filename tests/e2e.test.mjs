@@ -255,6 +255,65 @@ await test('hides banner ads but keeps normal content', async () => {
   await r.done();
 });
 
+/** Right-clicks an element and runs the "PopGuard: Hide this ad" menu item on it. */
+async function hideThisAd(page, selector, frameId = 0, frameUrl) {
+  await page.click(selector, { button: 'right' });
+  const tabId = await sw.evaluate((u) => chrome.tabs.query({ url: u }).then(([t]) => t.id), page.url());
+  return sw.evaluate(([tabId, frameId, frameUrl]) => onHideMenu({ menuItemId: 'popguard-hide', frameId, frameUrl }, { id: tabId }), [tabId, frameId, frameUrl]);
+}
+
+await test('"Hide this ad" on a normal link hides only that link, not every link to the site', async () => {
+  await storage.set({ cosmeticFilters: [] });
+  const r = await visit('hide-pick.html');
+  const res = await hideThisAd(r.page, '#normal img');
+  assert.doesNotMatch(res.selector, /href\*=/, `too broad: ${res.selector}`);
+  await r.page.waitForTimeout(400);
+  assert.equal(await r.page.isVisible('#normal'), false);
+  assert.equal(await r.page.isVisible('#normal2'), true, 'other links to the same site were hidden');
+  await r.page.reload(); await r.page.waitForTimeout(500);
+  assert.equal(await r.page.isVisible('#normal'), false, 'not hidden again after reload');
+  assert.equal(await r.page.isVisible('#normal2'), true);
+  await r.done();
+});
+
+await test('"Hide this ad" on an ad-network link hides every link to that ad network', async () => {
+  await storage.set({ cosmeticFilters: [] });
+  const r = await visit('hide-pick.html');
+  const res = await hideThisAd(r.page, '#adlink img');
+  assert.equal(res.selector, 'a[href*="ads.onclkds.com"]');
+  await r.page.waitForTimeout(400);
+  assert.equal(await r.page.isVisible('#adlink2'), false);
+  assert.equal(await r.page.isVisible('#normal'), true);
+  await r.done();
+});
+
+await test('"Hide this ad" never builds a rule on a generated id, and it still works after reload', async () => {
+  await storage.set({ cosmeticFilters: [] });
+  const r = await visit('hide-pick.html');
+  const res = await hideThisAd(r.page, '#dyn');
+  assert.doesNotMatch(res.selector, /a8f3k2b7/, `built on a generated id: ${res.selector}`);
+  await r.page.reload(); await r.page.waitForTimeout(500);
+  assert.equal(await r.page.isVisible('#dyn'), false);
+  assert.equal(await r.page.isVisible('#keep'), true);
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('"Hide this ad" inside an embedded frame hides that frame only, not every frame from its site', async () => {
+  await storage.set({ cosmeticFilters: [] });
+  const r = await visit('frames-pick.html');
+  const url = AD + 'real.html?video=a';
+  const tabId = await sw.evaluate((u) => chrome.tabs.query({ url: u }).then(([t]) => t.id), r.page.url());
+  const frameId = await sw.evaluate(([t, u]) => chrome.webNavigation.getAllFrames({ tabId: t }).then((fs) => fs.find((f) => f.url === u).frameId), [tabId, url]);
+  await r.page.frameLocator('#fa').locator('h1, body').first().click({ button: 'right' });
+  await sw.evaluate(([t, f, u]) => onHideMenu({ menuItemId: 'popguard-hide', frameId: f, frameUrl: u }, { id: t }), [tabId, frameId, url]);
+  await r.page.waitForTimeout(400);
+  assert.equal(await r.page.isVisible('#fa'), false);
+  assert.equal(await r.page.isVisible('#fb'), true, 'the other frame from the same site was hidden');
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
 await test('blocks trackers and custom domains from the Filters page', async () => {
   await storage.set({ customDomains: ['127.0.0.1'] });
   await wait(500);
