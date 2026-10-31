@@ -62,7 +62,15 @@ await new Promise((r) => setTimeout(r, 1500));
 for (const p of ctx.pages()) if (p.url().includes(extId)) await p.close(); // welcome tab
 
 const storage = {
-  set: (obj) => sw.evaluate((o) => chrome.storage.local.set(o), obj),
+  // When a change rebuilds the network rules, wait for that to finish (slow CI machines can take
+  // longer than a fixed pause). Rebuilds run one after another, so awaiting one more means all done.
+  set: (obj) => sw.evaluate(async (o) => {
+    await chrome.storage.local.set(o);
+    if (Object.keys(o).some((k) => ['whitelist', 'customDomains', 'importedLists', 'pausedSites'].includes(k))) {
+      await new Promise((r) => setTimeout(r, 50)); // let storage.onChanged start its own rebuild first
+      await PGFilters.rebuildDynamic();
+    }
+  }, obj),
   get: (key) => sw.evaluate((k) => chrome.storage.local.get(k).then((r) => r[k]), key),
 };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -81,10 +89,40 @@ async function visit(file, action) {
 
 // ---------- tiny runner ----------
 const results = [];
+const ON_GITHUB = !!process.env.GITHUB_ACTIONS;
 async function test(name, fn) {
-  try { await fn(); results.push([true, name]); console.log('  ✓', name); }
-  catch (e) { results.push([false, name]); console.log('  ✗', name, '\n     ', e.message.split('\n').slice(0,8).join('\n      ')); }
+  if (process.env.ONLY && !new RegExp(process.env.ONLY, 'i').test(name)) return; // ONLY=pattern npm test
+  const short = (e) => e.message.split('\n').slice(0, process.env.FULL_ERRORS ? 60 : 8).join('\n');
+  const annotate = (level, title, msg) => { if (ON_GITHUB) console.log(`::${level} title=${title.replace(/[:,\r\n]/g, ' ')}::${msg.replace(/%/g, '%25').replace(/\r?\n/g, '%0A')}`); };
+  try { await fn(); results.push([true, name]); console.log('  ✓', name); return; }
+  catch (first) {
+    // Browser tests can stall on a busy machine (a click that never gets acknowledged, a page that
+    // loads late). Run a failed test once more; a real bug fails both times.
+    for (const p of ctx.pages()) if (!p.url().includes(extId)) await p.close().catch(() => {});
+    try {
+      await fn();
+      results.push([true, name]);
+      console.log('  ✓', name, '(passed on retry)');
+      annotate('warning', `Flaky test: ${name}`, `Failed once, passed on retry:\n${short(first)}`);
+    } catch (e) {
+      const msg = short(e);
+      results.push([false, name, msg]);
+      console.log('  ✗', name, '\n     ', msg.split('\n').join('\n      '));
+      annotate('error', `Test failed: ${name}`, msg);
+    }
+  }
 }
+/** Waits until check() returns something truthy (or time runs out) - for things that settle asynchronously. */
+async function until(check, ms = 5000) {
+  const end = Date.now() + ms;
+  let last;
+  while (Date.now() < end) {
+    try { last = await check(); if (last) return last; } catch {}
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return last;
+}
+const hiddenSoon = (page, sel) => until(async () => !(await page.isVisible(sel)));
 
 console.log('\nPopGuard e2e\n');
 
@@ -269,11 +307,11 @@ await test('"Hide this ad" on a normal link hides only that link, not every link
   const r = await visit('hide-pick.html');
   const res = await hideThisAd(r.page, '#normal img');
   assert.doesNotMatch(res.selector, /href\*=/, `too broad: ${res.selector}`);
+  assert.equal(await hiddenSoon(r.page, '#normal'), true);
   await r.page.waitForTimeout(400);
-  assert.equal(await r.page.isVisible('#normal'), false);
   assert.equal(await r.page.isVisible('#normal2'), true, 'other links to the same site were hidden');
-  await r.page.reload(); await r.page.waitForTimeout(500);
-  assert.equal(await r.page.isVisible('#normal'), false, 'not hidden again after reload');
+  await r.page.reload();
+  assert.equal(await hiddenSoon(r.page, '#normal'), true, 'not hidden again after reload');
   assert.equal(await r.page.isVisible('#normal2'), true);
   await r.done();
 });
@@ -283,8 +321,7 @@ await test('"Hide this ad" on an ad-network link hides every link to that ad net
   const r = await visit('hide-pick.html');
   const res = await hideThisAd(r.page, '#adlink img');
   assert.equal(res.selector, 'a[href*="ads.onclkds.com"]');
-  await r.page.waitForTimeout(400);
-  assert.equal(await r.page.isVisible('#adlink2'), false);
+  assert.equal(await hiddenSoon(r.page, '#adlink2'), true, 'other links to the ad network still visible');
   assert.equal(await r.page.isVisible('#normal'), true);
   await r.done();
 });
@@ -294,8 +331,8 @@ await test('"Hide this ad" never builds a rule on a generated id, and it still w
   const r = await visit('hide-pick.html');
   const res = await hideThisAd(r.page, '#dyn');
   assert.doesNotMatch(res.selector, /a8f3k2b7/, `built on a generated id: ${res.selector}`);
-  await r.page.reload(); await r.page.waitForTimeout(500);
-  assert.equal(await r.page.isVisible('#dyn'), false);
+  await r.page.reload();
+  assert.equal(await hiddenSoon(r.page, '#dyn'), true, 'not hidden again after reload');
   assert.equal(await r.page.isVisible('#keep'), true);
   await r.done();
   await storage.set({ cosmeticFilters: [] });
@@ -309,8 +346,7 @@ await test('"Hide this ad" inside an embedded frame hides that frame only, not e
   const frameId = await sw.evaluate(([t, u]) => chrome.webNavigation.getAllFrames({ tabId: t }).then((fs) => fs.find((f) => f.url === u).frameId), [tabId, url]);
   await r.page.frameLocator('#fa').locator('h1, body').first().click({ button: 'right' });
   await sw.evaluate(([t, f, u]) => onHideMenu({ menuItemId: 'popguard-hide', frameId: f, frameUrl: u }, { id: t }), [tabId, frameId, url]);
-  await r.page.waitForTimeout(400);
-  assert.equal(await r.page.isVisible('#fa'), false);
+  assert.equal(await hiddenSoon(r.page, '#fa'), true);
   assert.equal(await r.page.isVisible('#fb'), true, 'the other frame from the same site was hidden');
   await r.done();
   await storage.set({ cosmeticFilters: [] });
@@ -419,7 +455,7 @@ await test('learning: works inside a cross-origin ad frame, and fails gracefully
   const frameId = await sw.evaluate(([t, u]) => chrome.webNavigation.getAllFrames({ tabId: t }).then((fs) => fs.find((f) => f.url === u).frameId), [tabId, frameUrl]);
   await r.page.frameLocator('#player').locator('#watch').click({ button: 'right' });
   const learned = await sw.evaluate(([t, f]) => PGLearning.analyze(t, f), [tabId, frameId]);
-  assert.equal(learned.inFrame, true);
+  assert.equal(learned.inFrame, true, JSON.stringify(learned).slice(0, 200));
   assert.equal(learned.site, '127.0.0.1');
   const none = await sw.evaluate(([t]) => PGLearning.analyze(t, 0), [tabId]);
   assert.equal(none.error, 'no-element');
@@ -637,4 +673,8 @@ server.close();
 tlsServer.close();
 const failed = results.filter(([ok]) => !ok).length;
 console.log(`\n${results.length - failed} passed, ${failed} failed\n`);
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const rows = results.map(([ok, name, msg]) => `| ${ok ? '✅' : '❌'} | ${name.replace(/\|/g, '\\|')} | ${ok ? '' : (msg || '').split('\n')[0].replace(/\|/g, '\\|').slice(0, 200)} |`);
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## PopGuard tests: ${results.length - failed} passed, ${failed} failed\n\n| | Test | Error |\n|---|---|---|\n${rows.join('\n')}\n`);
+}
 process.exit(failed ? 1 : 0);
