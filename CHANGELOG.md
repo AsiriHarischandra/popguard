@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.3.0
+- New: **Smart Ad Learning, Phase 1** (analyse and validate). When you use right-click "Hide this ad", PopGuard
+  first studies the ad locally: finds the ad box, ignores generated class names / ids, builds a fingerprint,
+  generates candidate selectors, validates each on the page (rejects ones that would hide normal content or
+  too much) and scores them 0-100 with a scope (this site / could work on other sites). Whether its server is an
+  ad server is scored separately. Results are drafts in session storage only - nothing new is blocked yet.
+  Design and roadmap: `docs/smart-learning.md`
+- The analysis code is injected only when you use the menu item; no new permissions; nothing leaves the browser
+- Tests: 41
+
 ## 2.2.1
 - Fix: right-click "Hide this ad" on a normal link hid every link to that site (it saved `a[href*="site"]`).
   That broad rule is now only used when the site is an ad network (on PopGuard's ad / betting lists, your custom

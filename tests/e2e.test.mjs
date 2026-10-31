@@ -258,8 +258,10 @@ await test('hides banner ads but keeps normal content', async () => {
 /** Right-clicks an element and runs the "PopGuard: Hide this ad" menu item on it. */
 async function hideThisAd(page, selector, frameId = 0, frameUrl) {
   await page.click(selector, { button: 'right' });
-  const tabId = await sw.evaluate((u) => chrome.tabs.query({ url: u }).then(([t]) => t.id), page.url());
-  return sw.evaluate(([tabId, frameId, frameUrl]) => onHideMenu({ menuItemId: 'popguard-hide', frameId, frameUrl }, { id: tabId }), [tabId, frameId, frameUrl]);
+  // the newest tab showing this page (an earlier test may have left one open)
+  const tabId = await sw.evaluate((u) => chrome.tabs.query({ url: u }).then((ts) => Math.max(...ts.map((t) => t.id))), page.url());
+  const out = await sw.evaluate(([tabId, frameId, frameUrl]) => onHideMenu({ menuItemId: 'popguard-hide', frameId, frameUrl }, { id: tabId }), [tabId, frameId, frameUrl]);
+  return { ...out.hid, learned: out.learned };
 }
 
 await test('"Hide this ad" on a normal link hides only that link, not every link to the site', async () => {
@@ -312,6 +314,116 @@ await test('"Hide this ad" inside an embedded frame hides that frame only, not e
   assert.equal(await r.page.isVisible('#fb'), true, 'the other frame from the same site was hidden');
   await r.done();
   await storage.set({ cosmeticFilters: [] });
+});
+
+// ---------- Smart ad learning (Phase 1: analyse + validate only) ----------
+/** Runs learn-core.js in a plain page so its pure functions can be checked directly. */
+async function learnCore(fn, arg) {
+  const page = await ctx.newPage();
+  await page.goto(SITE + 'real.html');
+  await page.addScriptTag({ path: path.join(EXT, 'shared/learn-core.js') });
+  const r = await page.evaluate(fn, arg);
+  await page.close();
+  return r;
+}
+
+await test('learning: tells generated class names and ids from stable and ad ones', async () => {
+  const kinds = await learnCore((tokens) => tokens.map((t) => PGLearn.tokenKind(t)), [
+    'css-1x2y3z', 'sc-bdVaJa', 'a8f3k2b7', 'Header_title__3xK9a', '550e8400-e29b-41d4-a716-446655440000', 'ad_1700000000',
+    'sidebar-ad', 'adContainer', 'ad-300x250', 'sponsored', 'header', 'add-to-cart', 'shadow', 'navbar', 'row', 'mb-4', 'col-12']);
+  assert.deepEqual(kinds, ['dynamic', 'dynamic', 'dynamic', 'dynamic', 'dynamic', 'dynamic',
+    'ad', 'ad', 'ad', 'ad', 'stable', 'stable', 'stable', 'stable', 'generic', 'generic', 'generic']);
+});
+
+await test('learning: fingerprints ignore generated names but change with the structure; unsafe selectors are rejected', async () => {
+  const r = await learnCore(() => {
+    const node = (classes, id, children) => PGLearn.normalizeNode({ tag: 'div', id, classes, attrs: {}, w: 300, h: 250, hosts: { link: 'ads.example' }, children });
+    const a = PGLearn.fingerprint(node(['sidebar-ad', 'css-1a2b3c'], 'ad-x9f8k2l1', ['span', 'a']));
+    const b = PGLearn.fingerprint(node(['sidebar-ad', 'css-9z8y7x'], 'ad-q1w2e3r4', ['span', 'a']));
+    const c = PGLearn.fingerprint(node(['sidebar-ad'], '', ['a', 'img', 'p']));
+    const safe = ['div.ad', 'div{}', 'a;b', 'x<y', '@import', 'a/*x*/', 'a'.repeat(201)].map(PGLearn.safeSelectorText);
+    return { same: a === b, diff: a !== c, safe };
+  });
+  assert.equal(r.same, true, 'same widget with different generated names got different fingerprints');
+  assert.equal(r.diff, true, 'different structure got the same fingerprint');
+  assert.deepEqual(r.safe, [true, false, false, false, false, false, false]);
+});
+
+await test('learning: right-clicking a missed ad finds a safe, stable rule and keeps it as a draft only', async () => {
+  await storage.set({ cosmeticFilters: [] });
+  await sw.evaluate(() => chrome.storage.session.set({ learnDrafts: [] }));
+  const r = await visit('learn-ads.html');
+  const { learned } = await hideThisAd(r.page, '#adimg');
+  assert.equal(learned.status, 'validated');
+  assert.equal(learned.best.selector, 'div.sidebar-ad');
+  assert.ok(learned.best.score >= 85, `score ${learned.best.score}`);
+  assert.equal(learned.best.scope, 'global');
+  assert.doesNotMatch(JSON.stringify(learned.candidates.map((c) => c.selector)), /css-8f3k2a|x9f8k2l1/, 'used a generated name');
+  assert.deepEqual([learned.network.host, learned.network.eligible], ['ads.onclkds.com', true]);
+  // privacy: host only, no URL, no page text
+  const json = JSON.stringify(learned);
+  assert.doesNotMatch(json, /learn-ads\.html|c\?id=1|Article title|normal card/);
+  // Phase 1: a draft in session storage, not an active rule
+  const drafts = await sw.evaluate(() => PGLearning.drafts());
+  assert.equal(drafts[0].id, learned.id);
+  assert.equal(drafts[0].active, false);
+  assert.ok(!(await storage.get('learnedRules')), 'learning saved a permanent rule in Phase 1');
+  assert.ok(!(await storage.get('cosmeticFilters')).some((f) => f.includes('sidebar-ad')), 'learning added a hiding rule in Phase 1');
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('learning: a generated slot id becomes a stable prefix rule, kept to this site', async () => {
+  const r = await visit('learn-ads.html');
+  const { learned } = await hideThisAd(r.page, '#slotinner');
+  assert.equal(learned.best?.selector, 'div[id^="ad-unit-"]');
+  // no ad network or ad label to prove it: good enough here, not for every site
+  assert.equal(learned.best.scope, 'site');
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('learning: normal content and too-broad patterns are rejected, not learned', async () => {
+  let r = await visit('learn-ads.html');
+  let { learned } = await hideThisAd(r.page, '#storyimg');
+  assert.equal(learned.status, 'rejected', `learned from normal content: ${learned.best?.selector}`);
+  assert.equal(learned.network, null, 'a link to the same site is not a network-rule candidate');
+  await r.done();
+  r = await visit('learn-ads.html');
+  ({ learned } = await hideThisAd(r.page, '#cardad'));
+  const card = learned.candidates.find((c) => c.selector.endsWith('div.card') || c.selector === 'div.card');
+  if (card) assert.equal(card.validation.valid, false, '"div.card" would also hide normal cards');
+  assert.ok(!learned.best || !/^div\.card$/.test(learned.best.selector));
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('learning: the same ad studied twice is recognised as a duplicate', async () => {
+  await sw.evaluate(() => chrome.storage.session.set({ learnDrafts: [] }));
+  let r = await visit('learn-ads.html');
+  const first = (await hideThisAd(r.page, '#adimg')).learned;
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+  r = await visit('learn-ads.html');
+  const second = (await hideThisAd(r.page, '#adimg')).learned;
+  assert.equal(second.fingerprint, first.fingerprint);
+  assert.equal(second.duplicateOf, first.id);
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('learning: works inside a cross-origin ad frame, and fails gracefully with nothing selected', async () => {
+  const r = await visit(classroom(SITE, AD + 'player.html'));
+  const tabId = await sw.evaluate((u) => chrome.tabs.query({ url: u }).then(([t]) => t.id), r.page.url());
+  const frameUrl = AD + 'player.html';
+  const frameId = await sw.evaluate(([t, u]) => chrome.webNavigation.getAllFrames({ tabId: t }).then((fs) => fs.find((f) => f.url === u).frameId), [tabId, frameUrl]);
+  await r.page.frameLocator('#player').locator('#watch').click({ button: 'right' });
+  const learned = await sw.evaluate(([t, f]) => PGLearning.analyze(t, f), [tabId, frameId]);
+  assert.equal(learned.inFrame, true);
+  assert.equal(learned.site, '127.0.0.1');
+  const none = await sw.evaluate(([t]) => PGLearning.analyze(t, 0), [tabId]);
+  assert.equal(none.error, 'no-element');
+  await r.done();
 });
 
 await test('blocks trackers and custom domains from the Filters page', async () => {

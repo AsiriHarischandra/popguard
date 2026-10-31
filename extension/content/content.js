@@ -87,7 +87,8 @@
   // button itself. The background only reopens the exact URL it just closed in this tab.
   if (window.top !== window) return;
   let noticeHost = null;
-  const showClosedNotice = (url) => {
+  /** A small notice: text with an optional bold part and an optional action button. */
+  const showNotice = ({ text, bold = '', action = '', onAction = null, ms = 12000 }) => {
     noticeHost?.remove();
     noticeHost = document.createElement('popguard-notice');
     const root = noticeHost.attachShadow({ mode: 'closed' });
@@ -100,22 +101,27 @@
         button{all:unset;cursor:pointer;padding:4px 8px;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;white-space:nowrap}
         .x{background:transparent;color:#9ca3af;font-weight:400}
       </style>
-      <div class="t" role="status"><div class="m">Closed a new tab to <b></b></div><button class="go">Open anyway</button><button class="x" aria-label="Dismiss">✕</button></div>`;
-    root.querySelector('b').textContent = PG.hostOf(url) || url;
+      <div class="t" role="status"><div class="m"><span></span><b></b></div><button class="go"></button><button class="x" aria-label="Dismiss">✕</button></div>`;
+    root.querySelector('.m span').textContent = text;
+    root.querySelector('.m b').textContent = bold;
     const me = noticeHost;
-    root.querySelector('.go').addEventListener('click', (e) => {
-      if (!e.isTrusted) return;
-      me.remove();
-      send({ type: 'reopenTab', url });
-    });
+    const go = root.querySelector('.go');
+    if (action && onAction) {
+      go.textContent = action;
+      go.addEventListener('click', (e) => { if (!e.isTrusted) return; me.remove(); onAction(); });
+    } else go.remove();
     root.querySelector('.x').addEventListener('click', () => me.remove());
     (document.body || document.documentElement).appendChild(me);
-    setTimeout(() => me.remove(), 12000);
+    setTimeout(() => me.remove(), ms);
   };
+  const showClosedNotice = (url) => showNotice({
+    text: 'Closed a new tab to ', bold: PG.hostOf(url) || url,
+    action: 'Open anyway', onAction: () => send({ type: 'reopenTab', url }),
+  });
   try {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg?.type !== 'tabClosed') return;
-      PG.getSettings().then((s) => { if (s.showNotices) showClosedNotice(msg.url); });
+      if (msg?.type === 'tabClosed') PG.getSettings().then((s) => { if (s.showNotices) showClosedNotice(msg.url); });
+      if (msg?.type === 'notice' && typeof msg.text === 'string') PG.getSettings().then((s) => { if (s.showNotices) showNotice({ text: msg.text.slice(0, 200), ms: 7000 }); });
     });
   } catch {}
 })();

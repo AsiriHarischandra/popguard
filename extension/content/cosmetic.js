@@ -109,7 +109,10 @@
 
   // ---- Right-click "Hide this ad" ----
   let lastRightClicked = null;
-  window.addEventListener('contextmenu', (e) => { lastRightClicked = e.target; }, true);
+  window.addEventListener('contextmenu', (e) => {
+    lastRightClicked = e.target;
+    PG.lastContextTarget = e.target; // read by content/learn.js (smart learning), same isolated world
+  }, true);
 
   // Ad network or betting host? Ad words in the name, or on PopGuard's ad / betting / custom lists.
   const isAdHost = async (h) => !!h && (AD_WORDS.test(h) ||

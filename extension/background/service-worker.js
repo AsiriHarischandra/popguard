@@ -1,5 +1,6 @@
 /* PopGuard service worker: wires the modules together. */
-importScripts('../shared/families.js', '../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js', 'pause.js');
+importScripts('../shared/families.js', '../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js', 'pause.js',
+  '../shared/learn-core.js', 'learning.js');
 
 async function syncEverything() {
   await PGFilters.applyRulesets();
@@ -74,12 +75,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // ---- Right-click "Hide this ad" ----
 // (a named function so the tests can run exactly what the menu click runs)
-function onHideMenu(info, tab) {
-  if (info.menuItemId !== 'popguard-hide' || !tab?.id) return Promise.resolve(null);
+async function onHideMenu(info, tab) {
+  if (info.menuItemId !== 'popguard-hide' || !tab?.id) return null;
   const send = (msg, frameId) => chrome.tabs.sendMessage(tab.id, msg, { frameId }).catch(() => null);
-  if (info.frameId) {
-    return Promise.all([send({ type: 'hideFrame', url: info.frameUrl }, 0), send({ type: 'pickHide' }, info.frameId)]);
-  }
-  return send({ type: 'pickHide' }, 0);
+  // Smart learning (Phase 1): study the ad first, while it's still visible. Analysis only - the
+  // result is a draft in session storage and never changes what gets hidden.
+  const learned = await PGLearning.analyze(tab.id, info.frameId || 0).catch(() => null);
+  const hid = info.frameId
+    ? await Promise.all([send({ type: 'hideFrame', url: info.frameUrl }, 0), send({ type: 'pickHide' }, info.frameId)])
+    : await send({ type: 'pickHide' }, 0);
+  const text = PGLearning.summary(learned);
+  if (text) send({ type: 'notice', text }, 0);
+  return { hid, learned };
 }
 chrome.contextMenus.onClicked.addListener((info, tab) => { onHideMenu(info, tab); });
