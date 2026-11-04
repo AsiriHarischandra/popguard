@@ -105,5 +105,33 @@ const PGFilters = (() => {
     return { count: domains.length, skipped };
   }
 
-  return { applyRulesets, rebuildDynamic, parseList, importList, cleanDomain };
+  /**
+   * Is this host a known ad / betting host? Checks the built-in ad and betting lists plus the
+   * user's custom domains and imported lists (a host or any of its parent domains).
+   * Used by "Hide this ad" so it only hides every link to a site when that site is an ad network.
+   */
+  let builtInAdHosts = null;
+  async function isAdHost(host) {
+    const h = cleanDomain(host || '');
+    if (!h) return false;
+    if (!builtInAdHosts) {
+      builtInAdHosts = new Set();
+      for (const file of ['rules/ads.json', 'rules/betting.json']) {
+        try {
+          const rules = await (await fetch(chrome.runtime.getURL(file))).json();
+          for (const r of rules) for (const d of r.condition?.requestDomains || []) builtInAdHosts.add(d);
+        } catch {}
+      }
+    }
+    const { customDomains = [], importedLists = [] } = await chrome.storage.local.get(['customDomains', 'importedLists']);
+    const user = new Set([...customDomains.map(cleanDomain), ...importedLists.flatMap((l) => (l.enabled !== false && l.domains) || [])]);
+    const parts = h.split('.');
+    for (let i = 0; i < parts.length - 1; i++) {
+      const d = parts.slice(i).join('.');
+      if (builtInAdHosts.has(d) || user.has(d)) return true;
+    }
+    return false;
+  }
+
+  return { applyRulesets, rebuildDynamic, parseList, importList, cleanDomain, isAdHost };
 })();

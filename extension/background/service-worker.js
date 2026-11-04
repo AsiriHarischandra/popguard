@@ -1,5 +1,6 @@
 /* PopGuard service worker: wires the modules together. */
-importScripts('../shared/families.js', '../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js', 'pause.js');
+importScripts('../shared/families.js', '../shared/defaults.js', 'stats.js', 'filters.js', 'guard.js', 'netstats.js', 'pause.js',
+  '../shared/learn-core.js', 'learning.js');
 
 async function syncEverything() {
   await PGFilters.applyRulesets();
@@ -43,6 +44,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'blocked': // from inject.js (via content.js) or content.js itself
       PGStats.record(msg.kind, { tabId, site, target: msg.url });
       break;
+    case 'isAdHost': // "Hide this ad": is the clicked link / frame an ad network?
+      PGFilters.isAdHost(msg.host).then((ad) => sendResponse({ ad }));
+      return true;
     case 'hidden':
       PGStats.record('banner', { tabId, site, target: msg.url });
       break;
@@ -70,12 +74,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 // ---- Right-click "Hide this ad" ----
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== 'popguard-hide' || !tab?.id) return;
-  if (info.frameId) {
-    chrome.tabs.sendMessage(tab.id, { type: 'hideFrame', url: info.frameUrl }, { frameId: 0 }).catch(() => {});
-    chrome.tabs.sendMessage(tab.id, { type: 'pickHide' }, { frameId: info.frameId }).catch(() => {});
-  } else {
-    chrome.tabs.sendMessage(tab.id, { type: 'pickHide' }, { frameId: 0 }).catch(() => {});
-  }
-});
+// (a named function so the tests can run exactly what the menu click runs)
+async function onHideMenu(info, tab) {
+  if (info.menuItemId !== 'popguard-hide' || !tab?.id) return null;
+  const send = (msg, frameId) => chrome.tabs.sendMessage(tab.id, msg, { frameId }).catch(() => null);
+  // Smart learning (Phase 1): study the ad first, while it's still visible. Analysis only - the
+  // result is a draft in session storage and never changes what gets hidden.
+  const learned = await PGLearning.analyze(tab.id, info.frameId || 0).catch(() => null);
+  const hid = info.frameId
+    ? await Promise.all([send({ type: 'hideFrame', url: info.frameUrl }, 0), send({ type: 'pickHide' }, info.frameId)])
+    : await send({ type: 'pickHide' }, 0);
+  const text = PGLearning.summary(learned);
+  if (text) send({ type: 'notice', text }, 0);
+  return { hid, learned };
+}
+chrome.contextMenus.onClicked.addListener((info, tab) => { onHideMenu(info, tab); });

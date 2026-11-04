@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.3.0
+- New: **Smart Ad Learning, Phase 1** (analyse and validate). When you use right-click "Hide this ad", PopGuard
+  first studies the ad locally: finds the ad box, ignores generated class names / ids, builds a fingerprint,
+  generates candidate selectors, validates each on the page (rejects ones that would hide normal content or
+  too much) and scores them 0-100 with a scope (this site / could work on other sites). Whether its server is an
+  ad server is scored separately. Results are drafts in session storage only - nothing new is blocked yet.
+  Design and roadmap: `docs/smart-learning.md`
+- The analysis code is injected only when you use the menu item; no new permissions; nothing leaves the browser
+- Tests: 41
+
+## 2.2.1
+- Fix: right-click "Hide this ad" on a normal link hid every link to that site (it saved `a[href*="site"]`).
+  That broad rule is now only used when the site is an ad network (on PopGuard's ad / betting lists, your custom
+  domains or imported lists, or with ad words in its name); otherwise only the clicked element is hidden
+- Fix: "Hide this ad" inside an embedded frame hid every frame from that site (e.g. every embedded video).
+  Now only the clicked frame, unless the frame is from an ad network
+- Fix: rules are no longer built on generated IDs (like `promo-a8f3k2b7`) that change on every visit
+- Tests: 34 (first tests for "Hide this ad")
+
 ## 2.2.0
 - New: **Pause for 1 hour** in the popup ("Something not working here?"). The site is treated like a
   whitelisted one until the pause runs out, then protection turns back on by itself (an alarm ends it).

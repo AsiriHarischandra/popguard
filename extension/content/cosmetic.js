@@ -109,16 +109,43 @@
 
   // ---- Right-click "Hide this ad" ----
   let lastRightClicked = null;
-  window.addEventListener('contextmenu', (e) => { lastRightClicked = e.target; }, true);
+  window.addEventListener('contextmenu', (e) => {
+    lastRightClicked = e.target;
+    PG.lastContextTarget = e.target; // read by content/learn.js (smart learning), same isolated world
+  }, true);
 
-  function selectorFor(el) {
+  // Ad network or betting host? Ad words in the name, or on PopGuard's ad / betting / custom lists.
+  const isAdHost = async (h) => !!h && (AD_WORDS.test(h) ||
+    await chrome.runtime.sendMessage({ type: 'isAdHost', host: h }).then((r) => !!r?.ad, () => false));
+
+  // IDs that are the same on every visit. Generated ones ("a8f3k2b", "ad_1700000000") change, so a
+  // rule built on them would stop working, or worse, match something else next time.
+  const stableId = (id) => /^[a-z][\w-]{2,}$/i.test(id) && (id.match(/\d/g) || []).length <= 2;
+
+  /**
+   * A selector for the element the user right-clicked. "Every link to adnetwork.com" is only used
+   * when that host really is an ad network - for any other site it would also hide normal links.
+   */
+  async function selectorFor(el) {
     const a = el.closest('a[href]');
-    if (a) { const lh = linkHostOf(a); if (lh && siteOf(lh) !== mySite) return `a[href*="${lh.replace(/^www\./, '')}"]`; }
+    if (a) {
+      const lh = linkHostOf(a).replace(/^www\./, '');
+      if (lh && siteOf(lh) !== mySite && await isAdHost(lh)) return `a[href*="${lh}"]`;
+    }
     const fr = el.closest('iframe[src]');
-    if (fr) { try { return `iframe[src*="${new URL(fr.src).hostname}"]`; } catch {} }
+    if (fr) {
+      let fh = '';
+      try { fh = new URL(fr.src).hostname; } catch {}
+      if (fh && siteOf(fh) !== mySite && await isAdHost(fh)) return `iframe[src*="${fh}"]`;
+    }
+    return pathSelector(el);
+  }
+
+  /** Path from the nearest ancestor with a stable ID (or <body>) down to this element. */
+  function pathSelector(el) {
     const parts = [];
     for (let n = el; n && n.nodeType === 1 && n !== document.body; n = n.parentElement) {
-      if (n.id && /^[a-z][\w-]{2,}$/i.test(n.id) && !/\d{4,}/.test(n.id)) { parts.unshift('#' + CSS.escape(n.id)); break; }
+      if (n.id && stableId(n.id)) { parts.unshift('#' + CSS.escape(n.id)); break; }
       let part = n.tagName.toLowerCase();
       const sibs = n.parentElement ? [...n.parentElement.children].filter((c) => c.tagName === n.tagName) : [];
       if (sibs.length > 1) part += `:nth-of-type(${sibs.indexOf(n) + 1})`;
@@ -127,24 +154,36 @@
     return parts.join(' > ');
   }
 
-  const saveHide = (sel) => chrome.storage.local.get('cosmeticFilters', ({ cosmeticFilters = [] }) => {
-    chrome.storage.local.set({ cosmeticFilters: [...new Set([...cosmeticFilters, `${host}##${sel}`])] });
-  });
+  const saveHide = async (sels) => {
+    const add = [].concat(sels).map((sel) => `${host}##${sel}`);
+    if (!add.length) return;
+    const { cosmeticFilters = [] } = await chrome.storage.local.get('cosmeticFilters');
+    await chrome.storage.local.set({ cosmeticFilters: [...new Set([...cosmeticFilters, ...add])] });
+  };
 
-  chrome.runtime.onMessage.addListener((msg) => {
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'pickHide' && lastRightClicked) {
       const el = lastRightClicked.closest('a[href], iframe, ins') || lastRightClicked;
-      saveHide(selectorFor(el));
-      hide(el);
       lastRightClicked = null;
+      hide(el);
+      selectorFor(el).then(async (sel) => { await saveHide(sel); sendResponse({ selector: sel }); });
+      return true;
     }
     if (msg.type === 'hideFrame' && window === window.top) {
-      // the ad was inside an iframe: hide that iframe from the top page
+      // The ad was inside an iframe: hide that iframe from the top page. Every frame from an ad
+      // network goes; for any other host only the frame that was clicked (e.g. not every YouTube video).
       let fh = '';
       try { fh = new URL(msg.url).hostname; } catch { return; }
-      const frames = [...document.querySelectorAll('iframe')].filter((f) => { try { return new URL(f.src, location.href).hostname === fh; } catch { return false; } });
-      frames.forEach(hide);
-      if (frames.length) saveHide(`iframe[src*="${fh}"]`);
+      const srcOf = (f) => { try { return new URL(f.src, location.href); } catch { return null; } };
+      const sameHost = [...document.querySelectorAll('iframe')].filter((f) => srcOf(f)?.hostname === fh);
+      isAdHost(fh).then((ad) => {
+        const exact = sameHost.filter((f) => srcOf(f)?.href === msg.url);
+        const frames = ad ? sameHost : (exact.length ? exact : sameHost.slice(0, 1));
+        frames.forEach(hide);
+        const sels = ad ? (frames.length ? [`iframe[src*="${fh}"]`] : []) : frames.map(pathSelector);
+        saveHide(sels).then(() => sendResponse({ selectors: sels }));
+      });
+      return true;
     }
   });
 

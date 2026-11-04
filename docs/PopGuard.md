@@ -1,7 +1,7 @@
 # PopGuard: Click Redirect & Pop-up Blocker
 
 **Author:** Asiri Harischandra
-**Current version:** 2.2.0
+**Current version:** 2.3.0
 **Store:** [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/pbiabfkcfocjnfljhpkipnelboohpbca)
 **Source code:** [github.com/AsiriHarischandra/popguard](https://github.com/AsiriHarischandra/popguard)
 **License:** MIT
@@ -44,7 +44,8 @@ Ordinary ad blockers are good at blocking ad *requests*. Click-hijacking sites u
   - **Betting & casino ads** (15 rules): 1xBet, Melbet, Mostbet and affiliate redirect domains
 - A company's own trackers are allowed on that company's own sites (for example LinkedIn's on linkedin.com) and blocked everywhere else (2.1.3)
 - **Banner hiding:** known ad boxes, plus banner-shaped images and iframes that link to other sites
-- **Right-click → "PopGuard: Hide this ad"** for anything the automatic rules miss
+- **Right-click → "PopGuard: Hide this ad"** for anything the automatic rules miss. It only hides every link to a site when that site is an ad network (2.2.1)
+- **Smart Ad Learning (Phase 1, 2.3.0):** when you hide an ad, PopGuard also studies it locally, works out a stable pattern for it (ignoring generated class names), checks the pattern won't hide normal content, and scores it. For now these are drafts only; see [smart-learning.md](smart-learning.md)
 
 ### Control and insight
 - **Popup:** blocks on this page, today and all time, the **last few things blocked on this page** (to see what broke a site), a **Protect this site** switch and **Pause for 1 hour**
@@ -95,6 +96,7 @@ Service worker (background)
   stats.js      batched statistics
   netstats.js   counts network blocks
   pause.js      "Pause for 1 hour": paused sites act like whitelisted ones until an alarm ends the pause
+  learning.js   Smart Ad Learning: runs the analysis when you hide an ad, keeps drafts
   families.js   which sites belong to the same company (shared with inject.js)
         │
         ▼
@@ -135,11 +137,13 @@ PopGuard **collects nothing**: no account, no server, no analytics. Settings, fi
 
 The extension is tested end to end with **Playwright**: the real extension runs in Chromium against test pages that copy each trick. `localhost` and `127.0.0.1` act as two different websites; `www.youtube.com` and `classroom.google.com` are mapped to a local HTTPS server with a test-only certificate.
 
-**30 automated tests** cover (they also run on GitHub for every pull request):
+**41 automated tests** cover (they also run on GitHub for every pull request):
 - pop-ups blocked, while real links still open (including links inside web components)
 - embedded players opening their own site (YouTube in Google Classroom), while unknown iframes still can't
 - same-company sites opening each other, while other sites can't
 - the "Open anyway" notice for closed tabs, which reopens only the tab that was closed
+- "Hide this ad": normal links and embedded frames hidden one at a time, ad networks everywhere, no generated ids
+- Smart Ad Learning: generated-name detection, fingerprints, safe selectors, rules for real ads, rejection of normal content and too-broad patterns, duplicates, ad frames, privacy, and that nothing is applied yet
 - pausing a site for an hour, the pause running out, and the popup's pause / resume buttons and recent-blocks list
 - overlays removed, with the click passed through
 - click-redirects, tab-unders, fake clicks and the iframe `window.open` trick
@@ -164,14 +168,14 @@ npm run icons          # render icons from docs/store/icon.svg
 ```
 extension/
   manifest.json
-  background/   service-worker.js · guard.js · filters.js · stats.js · netstats.js · pause.js
-  content/      inject.js · content.js · cosmetic.js · flags/
+  background/   service-worker.js · guard.js · filters.js · stats.js · netstats.js · pause.js · learning.js
+  content/      inject.js · content.js · cosmetic.js · learn.js (injected only when you hide an ad) · flags/
   rules/        ads.json · trackers.json · betting.json
-  shared/       defaults.js · families.js
+  shared/       defaults.js · families.js · learn-core.js
   ui/           dashboard.* · chart.js · popup.* · theme.css
 tests/          e2e.test.mjs · fixtures/ · certs/ (test-only certificate)
 scripts/        build.mjs · store-images.mjs · render-icons.mjs
-docs/           PopGuard.md · screenshots/ · store/ (listing text, images, publishing guide)
+docs/           PopGuard.md · smart-learning.md · screenshots/ · store/ (listing text, images, publishing guide)
 PRIVACY.md · CHANGELOG.md · README.md · LICENSE
 .github/workflows/test.yml   runs the tests on GitHub
 ```
@@ -191,6 +195,8 @@ PRIVACY.md · CHANGELOG.md · README.md · LICENSE
 | 2.1.3 | A company's own trackers allowed on its own sites (fixes LinkedIn account switching) |
 | 2.1.4 | Embedded players can open their own site (fixes the YouTube button on Google Classroom videos); same-company sites can open each other; "Open anyway" for closed tabs |
 | 2.2.0 | "Pause for 1 hour" and "last blocked on this page" in the popup; tests run automatically on GitHub |
+| 2.2.1 | "Hide this ad" no longer hides every link or every embedded frame from a normal site |
+| 2.3.0 | Smart Ad Learning, Phase 1: local analysis of hidden ads (patterns, fingerprints, validation, confidence), as drafts |
 
 ## 10. Development workflow
 
@@ -205,4 +211,4 @@ PRIVACY.md · CHANGELOG.md · README.md · LICENSE
 - Store installs can't show *which* domain a network block hit (a browser limitation), only the type and the site.
 - Redirects started by cross-origin frames are undone after the fact rather than prevented.
 - The registrable-domain check is a heuristic, not the full Public Suffix List.
-- Planned: one-click EasyList / EasyPrivacy subscriptions that update themselves, Chrome Web Store release, cosmetic rules from imported lists, a short demo video for the store page.
+- Planned: Smart Ad Learning phases 2–5 (saved rules, blocking with them, a dashboard page), one-click EasyList / EasyPrivacy subscriptions that update themselves, Chrome Web Store release, cosmetic rules from imported lists, a short demo video for the store page.
