@@ -45,13 +45,38 @@
     (document.head || document.documentElement).appendChild(styleEl);
   }
 
-  // Hide an element, plus wrapper boxes that only exist to hold it.
-  function hide(el) {
+  // ---- "is this the page itself?" ----
+  // Hiding must never take out the page: the video player, the article, or a wrapper around
+  // everything. Streaming sites often nest the whole site in single-child boxes, so climbing
+  // "wrappers that only hold the ad" could otherwise reach the top and leave a black page.
+  const viewArea = () => (innerWidth || document.documentElement.clientWidth) * (innerHeight || document.documentElement.clientHeight);
+  const areaOf = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
+  const smallFrame = () => window !== window.top && viewArea() <= 640 * 480; // an ad-sized frame: everything in it is "big"
+  function isPageContent(el) {
+    if (!el || el === document.documentElement || el === document.body) return true;
+    if (el.matches('main, article, [role="main"], header, nav, footer, form')) return true;
+    if (el.querySelector('main, article, h1, form, input, textarea, select')) return true;
+    if ((el.textContent || '').replace(/\s+/g, ' ').trim().length > 400) return true;
+    return !smallFrame() && areaOf(el) > viewArea() * 0.5;
+  }
+  // A see-through layer over the page (the click-catching kind): fine to hide, it shows nothing.
+  function isInvisibleLayer(el) {
+    if (el.matches('iframe, img, video, canvas, svg, embed, object, picture')) return false; // shows something by itself
+    const cs = getComputedStyle(el);
+    if (parseFloat(cs.opacity) < 0.1) return true;
+    return /^(transparent|rgba\(.*,\s*0(\.0+)?\))$/.test(cs.backgroundColor) && cs.backgroundImage === 'none' &&
+      !el.querySelector('img, video, iframe, canvas, svg') && !(el.textContent || '').trim();
+  }
+
+  // Hide an element, plus wrapper boxes that only exist to hold it (about the same size as it).
+  function hide(el, { climb = true } = {}) {
     let target = el;
-    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const base = areaOf(el);
+    for (let p = el.parentElement; climb && p && p !== document.body; p = p.parentElement) {
       const onlyChild = p.children.length === 1 && !(p.textContent || '').replace(/\s+/g, '').length
         || [...p.children].every((c) => c === target || c.matches('br,script,style,ins,noscript') || c.hasAttribute('data-popguard-hidden'));
       if (!onlyChild || (p.textContent || '').trim().length > 40) break;
+      if (isPageContent(p) || (base > 0 && areaOf(p) > base * 1.6 + 2000)) break; // a layout box, not a wrapper
       target = p;
     }
     if (target.hasAttribute('data-popguard-hidden')) return;
@@ -163,8 +188,19 @@
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'pickHide' && lastRightClicked) {
-      const el = lastRightClicked.closest('a[href], iframe, ins') || lastRightClicked;
+      const clicked = lastRightClicked;
       lastRightClicked = null;
+      let el = clicked.closest('a[href], iframe, ins') || clicked;
+      if (isPageContent(el) && el !== clicked && !isPageContent(clicked)) el = clicked;
+      if (isPageContent(el)) {
+        if (!isInvisibleLayer(el) || el === document.body || el === document.documentElement) {
+          sendResponse({ refused: 'page-content' }); // e.g. the video player: not an ad, never hide it
+          return;
+        }
+        hide(el, { climb: false }); // a see-through click-catcher over the page: hide just it, don't save
+        sendResponse({ selector: null, overlay: true });
+        return;
+      }
       hide(el);
       selectorFor(el).then(async (sel) => { await saveHide(sel); sendResponse({ selector: sel }); });
       return true;
@@ -178,7 +214,10 @@
       const sameHost = [...document.querySelectorAll('iframe')].filter((f) => srcOf(f)?.hostname === fh);
       isAdHost(fh).then((ad) => {
         const exact = sameHost.filter((f) => srcOf(f)?.href === msg.url);
-        const frames = ad ? sameHost : (exact.length ? exact : sameHost.slice(0, 1));
+        let frames = ad ? sameHost : (exact.length ? exact : sameHost.slice(0, 1));
+        // a big frame from a normal site is the page's player or content, not an ad
+        if (!ad) frames = frames.filter((f) => !isPageContent(f));
+        if (!frames.length) { sendResponse({ refused: 'page-content' }); return; }
         frames.forEach(hide);
         const sels = ad ? (frames.length ? [`iframe[src*="${fh}"]`] : []) : frames.map(pathSelector);
         saveHide(sels).then(() => sendResponse({ selectors: sels }));
@@ -186,6 +225,27 @@
       return true;
     }
   });
+
+  // ---- safety net for saved rules ----
+  // A right-click rule saved by an older version (or typed in by hand) may hide the page itself.
+  // Once the page is there, check this site's rules: one that hides page content is dropped.
+  function dropUnsafeRules() {
+    if (whitelisted || !userHides.length || !document.body) return;
+    if (styleEl) styleEl.disabled = true; // measure the page as it would look without our rules
+    const bad = userHides.filter((sel) => {
+      try { return [...document.querySelectorAll(sel)].some((m) => isPageContent(m) && !isInvisibleLayer(m)); } catch { return true; }
+    });
+    if (styleEl) styleEl.disabled = false;
+    if (!bad.length) return;
+    userHides = userHides.filter((sel) => !bad.includes(sel));
+    writeCss();
+    chrome.storage.local.get('cosmeticFilters', ({ cosmeticFilters = [] }) => {
+      const drop = new Set(bad.map((sel) => `${host}##${sel}`)); // only this site's own picks, never general filters
+      const next = cosmeticFilters.filter((f) => !drop.has(f));
+      if (next.length !== cosmeticFilters.length) chrome.storage.local.set({ cosmeticFilters: next });
+    });
+    send({ type: 'unsafeRulesDropped', count: bad.length });
+  }
 
   // ---- start ----
   const load = async () => {
@@ -199,6 +259,8 @@
   load().then(() => {
     if (whitelisted || !enabled) return;
     const start = () => {
+      dropUnsafeRules();
+      window.addEventListener('load', dropUnsafeRules, { once: true });
       scan();
       new MutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'href'] });
       window.addEventListener('load', scan);

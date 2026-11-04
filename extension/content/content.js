@@ -121,7 +121,7 @@
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg?.type === 'tabClosed') PG.getSettings().then((s) => { if (s.showNotices) showClosedNotice(msg.url); });
-      if (msg?.type === 'notice' && typeof msg.text === 'string') PG.getSettings().then((s) => { if (s.showNotices) showNotice({ text: msg.text.slice(0, 200), ms: 7000 }); });
+      if (msg?.type === 'notice' && typeof msg.text === 'string') PG.getSettings().then((s) => { if (s.showNotices) showNotice({ text: msg.text.slice(0, 280), ms: 9000 }); });
     });
   } catch {}
 })();

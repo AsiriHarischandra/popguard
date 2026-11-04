@@ -44,6 +44,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'blocked': // from inject.js (via content.js) or content.js itself
       PGStats.record(msg.kind, { tabId, site, target: msg.url });
       break;
+    case 'unsafeRulesDropped': // cosmetic.js removed a saved hide rule that was hiding the page itself
+      if (tabId != null) chrome.tabs.sendMessage(tabId, { type: 'notice', text: 'PopGuard removed a saved "Hide this ad" rule that was hiding part of this page.' }, { frameId: 0 }).catch(() => {});
+      break;
     case 'isAdHost': // "Hide this ad": is the clicked link / frame an ad network?
       PGFilters.isAdHost(msg.host).then((ad) => sendResponse({ ad }));
       return true;
@@ -84,8 +87,12 @@ async function onHideMenu(info, tab) {
   const hid = info.frameId
     ? await Promise.all([send({ type: 'hideFrame', url: info.frameUrl }, 0), send({ type: 'pickHide' }, info.frameId)])
     : await send({ type: 'pickHide' }, 0);
-  const text = PGLearning.summary(learned);
+  // Nothing hidden because the right-click landed on the page itself (e.g. the video player)?
+  const refused = info.frameId ? hid.every((r) => !r || r.refused) && hid.some((r) => r?.refused) : !!hid?.refused;
+  const text = refused
+    ? 'That looks like part of the page (like the video player), not an ad, so PopGuard left it alone. Right-click the ad itself, or use "Pause for 1 hour" if the page is not working.'
+    : PGLearning.summary(learned);
   if (text) send({ type: 'notice', text }, 0);
-  return { hid, learned };
+  return { hid, learned, refused };
 }
 chrome.contextMenus.onClicked.addListener((info, tab) => { onHideMenu(info, tab); });
