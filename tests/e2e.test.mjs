@@ -247,6 +247,18 @@ await test('undoes a timed redirect started by an ad iframe', async () => {
   await p.close();
 });
 
+await test('undoes an ad-frame redirect even after the background was stopped for being idle', async () => {
+  const p = await ctx.newPage();
+  await p.goto(SITE + 'iframe-timed.html');
+  await p.waitForTimeout(500);
+  await p.click('#ad', { position: { x: 50, y: 50 } });
+  await p.waitForTimeout(4000);
+  await sw.evaluate(() => PGGuard._simulateRestart()); // Chrome stops an idle service worker after ~30 s
+  await p.waitForTimeout(10000);
+  assert.equal(p.url(), SITE + 'iframe-timed.html');
+  await p.close();
+});
+
 await test('a link clicked after reading for a while still opens', async () => {
   const p = await ctx.newPage();
   await p.goto(SITE + 'article-link.html');

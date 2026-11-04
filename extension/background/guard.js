@@ -7,7 +7,26 @@
  */
 const PGGuard = (() => {
   const MAIN_ID = 'popguard-main';
-  const lastClick = new Map();   // tabId -> { href, t }
+  // Chrome stops an idle service worker after about 30 seconds, which wipes anything kept only in
+  // memory. A redirect a few minutes after the page loaded would then find no "previous page" and
+  // get through. So the per-tab state the guard needs later is mirrored to session storage
+  // (kept until the browser closes, never written to disk).
+  function sessionMap(prefix) {
+    const mem = new Map();
+    const key = (id) => prefix + id;
+    return {
+      set(id, v) { mem.set(id, v); chrome.storage.session.set({ [key(id)]: v }).catch(() => {}); },
+      async get(id) {
+        if (mem.has(id)) return mem.get(id);
+        const v = (await chrome.storage.session.get(key(id)).catch(() => ({})))[key(id)];
+        if (v) mem.set(id, v);
+        return v;
+      },
+      delete(id) { mem.delete(id); chrome.storage.session.remove(key(id)).catch(() => {}); },
+      forgetMemory() { mem.clear(); },
+    };
+  }
+  const lastClick = sessionMap('pg:click:'); // tabId -> { href, frameUrl, t }
   const watchBlank = new Map();  // new tabId -> { srcTabId, srcUrl, until }
   const strip = (u) => (u || '').split('#')[0].replace(/\/$/, '');
 
@@ -37,7 +56,7 @@ const PGGuard = (() => {
     if (PG.isWhitelisted(PG.hostOf(srcUrl), await PG.getAllowList())) return;
     if (PG.sameOwner(targetUrl, srcUrl)) return; // same site, or the same company (Classroom -> YouTube)
     if (PG.isSignIn(targetUrl)) return; // "Sign in with ..." windows
-    if (userOpened(srcTabId, targetUrl)) return;
+    if (await userOpened(srcTabId, targetUrl)) return;
     chrome.tabs.remove(newTabId).catch(() => {});
     chrome.tabs.update(srcTabId, { active: true }).catch(() => {});
     PGStats.record('tab', { tabId: srcTabId, site: PG.hostOf(srcUrl), target: targetUrl });
@@ -55,8 +74,8 @@ const PGGuard = (() => {
    * A plain click on the page itself still has to match exactly: pop-under scripts like to open
    * an ad on the same host as the link you clicked.
    */
-  function userOpened(tabId, targetUrl) {
-    const lc = lastClick.get(tabId);
+  async function userOpened(tabId, targetUrl) {
+    const lc = await lastClick.get(tabId);
     if (!lc || Date.now() - lc.t > 3000) return false;
     if (lc.href && strip(lc.href) === strip(targetUrl)) return true;
     const inFrameOf = lc.frameUrl && PG.sameOwner(lc.frameUrl, targetUrl);
@@ -84,10 +103,10 @@ const PGGuard = (() => {
   // iframe): if the tab was sitting idle on a page for a while and a script - not the user -
   // moved it to another site, go back.
   const IDLE_MS = 10000;
-  const lastPage = new Map(); // tabId -> { url, t }
+  const lastPage = sessionMap('pg:page:'); // tabId -> { url, t }
   async function undoTimedRedirect(d) {
     if (d.frameId !== 0) return;
-    const prev = lastPage.get(d.tabId);
+    const prev = await lastPage.get(d.tabId);
     lastPage.set(d.tabId, { url: d.url, t: d.timeStamp });
     const q = d.transitionQualifiers || [];
     // Script redirects arrive as 'client_redirect', but a redirect started by an ad iframe looks
@@ -98,7 +117,7 @@ const PGGuard = (() => {
     if (/\.pdf([?#]|$)/i.test(prev.url)) return;                    // PDF viewer: clicks aren't visible to us
     if (PG.sameOwner(prev.url, d.url) || PG.isSignIn(d.url)) return;
     if (d.timeStamp - prev.t < IDLE_MS) return;                     // redirect during page load
-    const lc = lastClick.get(d.tabId);
+    const lc = await lastClick.get(d.tabId);
     if (lc && Date.now() - lc.t < IDLE_MS) return;                  // user was just active
     const settings = await PG.getSettings();
     if (!settings.blockRedirects) return;
@@ -134,5 +153,7 @@ const PGGuard = (() => {
   return {
     registerMain, listen, judgeNewTab, reopen,
     noteClick: (tabId, href, frameUrl) => lastClick.set(tabId, { href, frameUrl, t: Date.now() }),
+    /** tests only: what a service-worker restart does to the in-memory state */
+    _simulateRestart() { lastClick.forgetMemory(); lastPage.forgetMemory(); },
   };
 })();

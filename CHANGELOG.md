@@ -9,7 +9,11 @@
     PopGuard shows "That looks like part of the page..." instead
   - an invisible click-catching layer over the page is still removed (just that layer)
 - Fix: a saved rule that hides the page itself is dropped automatically the next time the site is opened
-- Tests: 44
+- Fix: redirects started by an ad or player frame a few minutes after the page loaded (e.g. a streaming site
+  jumping to a trading-site affiliate link) were not undone. Chrome stops PopGuard's background worker after
+  about 30 seconds idle, which wiped its memory of the previous page. That state is now kept in session storage
+- The "removed a saved rule" notice only shows on the page it happened on
+- Tests: 45
 
 ## 2.3.0
 - New: **Smart Ad Learning, Phase 1** (analyse and validate). When you use right-click "Hide this ad", PopGuard

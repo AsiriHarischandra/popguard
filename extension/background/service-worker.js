@@ -45,7 +45,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       PGStats.record(msg.kind, { tabId, site, target: msg.url });
       break;
     case 'unsafeRulesDropped': // cosmetic.js removed a saved hide rule that was hiding the page itself
-      if (tabId != null) chrome.tabs.sendMessage(tabId, { type: 'notice', text: 'PopGuard removed a saved "Hide this ad" rule that was hiding part of this page.' }, { frameId: 0 }).catch(() => {});
+      // only to the page it happened on - not to whatever the tab shows by the time this arrives
+      if (tabId != null) chrome.tabs.sendMessage(tabId, { type: 'notice', text: 'PopGuard removed a saved "Hide this ad" rule that was hiding part of this page.' },
+        sender.frameId === 0 && sender.documentId ? { documentId: sender.documentId } : { frameId: 0 }).catch(() => {});
       break;
     case 'isAdHost': // "Hide this ad": is the clicked link / frame an ad network?
       PGFilters.isAdHost(msg.host).then((ad) => sendResponse({ ad }));
