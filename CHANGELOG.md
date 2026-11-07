@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.3.1
+- Fix: right-click "Hide this ad" on a streaming site could leave a black page. Hiding climbed through
+  "wrapper" boxes around the ad, and on sites that nest everything in single-child boxes it reached the box
+  around the whole site; right-clicking the video player hid the player. Now:
+  - wrappers are only hidden when they are about the same size as the ad
+  - the video player, the article, forms, or anything covering more than half the screen is never hidden;
+    PopGuard shows "That looks like part of the page..." instead
+  - an invisible click-catching layer over the page is still removed (just that layer)
+- Fix: a saved rule that hides the page itself is dropped automatically the next time the site is opened
+- Fix: redirects started by an ad or player frame a few minutes after the page loaded (e.g. a streaming site
+  jumping to a trading-site affiliate link) were not undone. Chrome stops PopGuard's background worker after
+  about 30 seconds idle, which wiped its memory of the previous page. That state is now kept in session storage
+- The "removed a saved rule" notice only shows on the page it happened on
+- Tests: 45
+
 ## 2.3.0
 - New: **Smart Ad Learning, Phase 1** (analyse and validate). When you use right-click "Hide this ad", PopGuard
   first studies the ad locally: finds the ad box, ignores generated class names / ids, builds a fingerprint,

@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Streaming site</title>
+<!-- Like many streaming sites: the whole site is nested in single-child boxes around a big
+     player frame, and a banner ad sits in its own slot inside a full-height stage. -->
+<style>body{margin:0;background:#000;color:#fff;font:14px system-ui} #root,#stage{min-height:100vh}</style>
+<div id="root"><div id="stage">
+  <div class="player-wrap"><iframe id="player" src="http://127.0.0.1:8765/player.html" width="1100" height="620" title="Player"></iframe></div>
+</div></div>

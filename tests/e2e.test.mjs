@@ -247,6 +247,18 @@ await test('undoes a timed redirect started by an ad iframe', async () => {
   await p.close();
 });
 
+await test('undoes an ad-frame redirect even after the background was stopped for being idle', async () => {
+  const p = await ctx.newPage();
+  await p.goto(SITE + 'iframe-timed.html');
+  await p.waitForTimeout(500);
+  await p.click('#ad', { position: { x: 50, y: 50 } });
+  await p.waitForTimeout(4000);
+  await sw.evaluate(() => PGGuard._simulateRestart()); // Chrome stops an idle service worker after ~30 s
+  await p.waitForTimeout(10000);
+  assert.equal(p.url(), SITE + 'iframe-timed.html');
+  await p.close();
+});
+
 await test('a link clicked after reading for a while still opens', async () => {
   const p = await ctx.newPage();
   await p.goto(SITE + 'article-link.html');
@@ -348,6 +360,51 @@ await test('"Hide this ad" inside an embedded frame hides that frame only, not e
   await sw.evaluate(([t, f, u]) => onHideMenu({ menuItemId: 'popguard-hide', frameId: f, frameUrl: u }, { id: t }), [tabId, frameId, url]);
   assert.equal(await hiddenSoon(r.page, '#fa'), true);
   assert.equal(await r.page.isVisible('#fb'), true, 'the other frame from the same site was hidden');
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('"Hide this ad" never hides the video player or the whole page', async () => {
+  await storage.set({ cosmeticFilters: [] });
+  const r = await visit('stream-player.html');
+  const url = AD + 'player.html';
+  const tabId = await sw.evaluate((u) => chrome.tabs.query({ url: u }).then((ts) => Math.max(...ts.map((t) => t.id))), r.page.url());
+  const frameId = await sw.evaluate(([t, u]) => chrome.webNavigation.getAllFrames({ tabId: t }).then((fs) => fs.find((f) => f.url === u).frameId), [tabId, url]);
+  // right-click on the player's empty area (its <body>), like right-clicking the video
+  await r.page.frameLocator('#player').locator('body').click({ button: 'right', position: { x: 600, y: 400 } });
+  const out = await sw.evaluate(([t, f, u]) => onHideMenu({ menuItemId: 'popguard-hide', frameId: f, frameUrl: u }, { id: t }), [tabId, frameId, url]);
+  assert.equal(out.refused, true, JSON.stringify(out.hid));
+  await r.page.waitForTimeout(400);
+  assert.equal(await r.page.isVisible('#player'), true, 'the player was hidden');
+  assert.equal(await r.page.isVisible('#root'), true, 'the page was hidden');
+  assert.deepEqual(await storage.get('cosmeticFilters'), [], 'a rule was saved');
+  // a small thing inside the player is still fine to hide
+  await r.page.frameLocator('#player').locator('#watch').click({ button: 'right' });
+  await sw.evaluate(([t, f, u]) => onHideMenu({ menuItemId: 'popguard-hide', frameId: f, frameUrl: u }, { id: t }), [tabId, frameId, url]);
+  assert.equal(await until(async () => !(await r.page.frameLocator('#player').locator('#watch').isVisible())), true);
+  assert.equal(await r.page.isVisible('#player'), true);
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('"Hide this ad" on a banner in full-page wrappers hides the banner, not the page', async () => {
+  await storage.set({ cosmeticFilters: [] });
+  const r = await visit('stream-ad.html');
+  await hideThisAd(r.page, '#banner img');
+  assert.equal(await hiddenSoon(r.page, '#banner'), true);
+  assert.equal(await r.page.isVisible('#stage'), true, 'the full-page wrapper was hidden (black page)');
+  assert.equal(await r.page.isVisible('#root'), true);
+  await r.done();
+  await storage.set({ cosmeticFilters: [] });
+});
+
+await test('a saved rule that hides the page itself is removed automatically', async () => {
+  await storage.set({ cosmeticFilters: ['localhost###root', 'localhost##.player-wrap > iframe', 'localhost##.slot'] });
+  const r = await visit('stream-player.html');
+  assert.equal(await until(() => r.page.isVisible('#player')), true, 'player still hidden by a saved rule');
+  assert.equal(await r.page.isVisible('#root'), true);
+  const left = await until(async () => { const f = await storage.get('cosmeticFilters'); return f.length === 1 && f; });
+  assert.deepEqual(left, ['localhost##.slot'], 'only the harmless rule should be kept');
   await r.done();
   await storage.set({ cosmeticFilters: [] });
 });
